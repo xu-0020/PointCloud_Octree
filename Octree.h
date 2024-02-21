@@ -8,7 +8,7 @@ private:
     OctreeNode* root;
     int maxDepth;
     int maxPointsPerNode;
-
+    int depthAdjustmentFactor;
 
     // Function to determine the child index for a point
     int getOctant(const Point& origin, Point& point);
@@ -18,8 +18,11 @@ private:
     
     void subdivideAndInsert(OctreeNode* node, Point& point, int depth);
 
+    // Function to visualize built node in the Octree
+    void visualizeNode(OctreeNode* node, int level);
+
 public:
-    Octree(Point origin, float initialSize, int maxDepth, int maxPoints) : maxDepth(maxDepth), maxPointsPerNode(maxPoints) {
+    Octree(Point origin, float initialSize, int maxDepth, int maxPoints, int depthFactor) : maxDepth(maxDepth), maxPointsPerNode(maxPoints), depthAdjustmentFactor(depthFactor) {
         root = new OctreeNode(origin, initialSize);
     }
 
@@ -31,4 +34,8 @@ public:
         insert(root, point, 0);
     }
 
+    // Function to visualize octree
+    void visualize() {
+        visualizeNode(root, 0);
+    }
 };

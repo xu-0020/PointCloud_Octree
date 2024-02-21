@@ -1,3 +1,4 @@
+#include <iostream>
 #include "Octree.h"
 
 
@@ -12,8 +13,11 @@ int Octree::getOctant(const Point& origin, Point& point) {
 
 
 void Octree::insert(OctreeNode* node, Point& point, int depth) {
+    // Adjust the maximum number of points per node based on the depth
+    int adjustedMaxPoints = maxPointsPerNode + depth * depthAdjustmentFactor;
+
     if (node->isLeaf()) {
-        if (node->points.size() < maxPointsPerNode || depth >= maxDepth) {
+        if (node->points.size() < adjustedMaxPoints || depth >= maxDepth) {
             node->points.push_back(point);
             return;
         }
@@ -47,4 +51,20 @@ void Octree::subdivideAndInsert(OctreeNode* node, Point& point, int depth) {
         node->children[octant] = new OctreeNode(newOrigin, newSize);
     }
     insert(node->children[octant], point, depth + 1);
+}
+
+void Octree::visualizeNode(OctreeNode* node, int level) {
+    if (!node) return;
+
+    for (int i=0; i<level; i++) cout << "  ";   // Indentation
+
+    if (node->isLeaf()) {
+        cout << "Level " << level << ": Leaf node with " << node->points.size() << " points\n";
+    }
+    else {
+        cout << "Level " << level << ": Internal node\n";
+        for (int i=0; i<8; i++) {
+            visualizeNode(node->children[i], level+1);
+        }
+    }
 }
