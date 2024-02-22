@@ -106,10 +106,10 @@ int main() {
     Point origin = bounds.getCenter();       
     float initialSize = bounds.getSize();   
 
-    // Variable settings for 1GB CSV Point Cloud Data(Montreal)
-    int maxDepth = 100;
-    int maxPointsPerNode = 1000;
-    int depthAdjustmentFactor = 20;
+    // Variable settings for 3GB CSV Point Cloud Data(Montreal)
+    int maxDepth = 6;
+    int maxPointsPerNode = 10000;
+    int depthAdjustmentFactor = 1000;
 
     // Build Octree
     Octree octree(origin, initialSize, maxDepth, maxPointsPerNode, depthAdjustmentFactor);
