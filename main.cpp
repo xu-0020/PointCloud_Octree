@@ -6,6 +6,9 @@
 #include "Octree.h"
 using namespace std;
 
+#include <filesystem>
+namespace fs = filesystem;
+
 
 Bounds computeBoundingBoxFromCSV(const vector<string>& filenames) {
     Bounds bounds;
@@ -79,37 +82,51 @@ void buildOctreeFromCSV(const vector<string>& filenames, Octree& octree) {
 
 
 int main() {
-    vector<string> filenames;
-    string filePath;
+    string choice;
+    cout << "Please select input file by folder name(0) or path(1):" << endl;
+    getline(cin, choice);
 
-    while (true) {
-        cout << "Enter CSV file paths (Enter 'done' when finished):" << endl;
-        getline(cin, filePath);
-        if (filePath == "done") { 
-            break;
+    vector<string> filenames;
+    if (choice == "0") {
+        string folderPath;
+        cout << "Enter the path to the folder containing CSV files:" << endl;
+        getline(cin, folderPath);
+
+        for (auto& entry : fs::directory_iterator(folderPath)) {
+            if (entry.path().extension() == ".csv") {
+                filenames.push_back(entry.path().string());
+            }
         }
-        filenames.push_back(filePath);
     }
+
+    else if (choice == "1") {
+        string filePath;
+        while (true) {
+            cout << "Enter CSV file paths (Enter 'done' when finished):" << endl;
+            getline(cin, filePath);
+            if (filePath == "done") { 
+                break;
+            }
+            filenames.push_back(filePath);
+        }
+    }
+
 
     if (filenames.empty()) {
         cerr << "No filenames provided." << endl;
         return 1; 
     }
 
-    /*
-    "Montreal-PointCloud/Montreal1.csv",
-    "Montreal-PointCloud/Montreal2.csv"
-    */
 
     // Compute the bounding box 
     Bounds bounds = computeBoundingBoxFromCSV(filenames);
     Point origin = bounds.getCenter();       
     float initialSize = bounds.getSize();   
 
-    // Variable settings for 3GB CSV Point Cloud Data(Montreal)
+    // Variable settings
     int maxDepth = 6;
-    int maxPointsPerNode = 10000;
-    int depthAdjustmentFactor = 1000;
+    int maxPointsPerNode = 30000;
+    int depthAdjustmentFactor = 10000;
 
     // Build Octree
     Octree octree(origin, initialSize, maxDepth, maxPointsPerNode, depthAdjustmentFactor);
