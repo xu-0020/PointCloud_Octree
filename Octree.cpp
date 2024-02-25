@@ -13,11 +13,8 @@ int Octree::getOctant(const Point& origin, Point& point) {
 
 
 void Octree::insert(OctreeNode* node, Point& point, int depth) {
-    // Adjust the maximum number of points per node based on the depth
-    int adjustedMaxPoints = maxPointsPerNode + depth * depthAdjustmentFactor;
-
     if (node->isLeaf()) {
-        if (node->points.size() < adjustedMaxPoints || depth >= maxDepth) {
+        if (node->points.size() < maxPointsPerNode || depth >= maxDepth) {
             node->points.push_back(point);
             return;
         }
@@ -31,7 +28,6 @@ void Octree::insert(OctreeNode* node, Point& point, int depth) {
     else {
         subdivideAndInsert(node, point, depth);
     }
-
 }
 
 void Octree::subdivideAndInsert(OctreeNode* node, Point& point, int depth) {
@@ -53,18 +49,58 @@ void Octree::subdivideAndInsert(OctreeNode* node, Point& point, int depth) {
     insert(node->children[octant], point, depth + 1);
 }
 
-void Octree::visualizeNode(OctreeNode* node, int level) {
+
+void Octree::visualizeNode(OctreeNode* node, int level, ofstream& outFile) {
     if (!node) return;
 
-    for (int i=0; i<level; i++) cout << "  ";   // Indentation
+    for (int i=0; i<level; i++) outFile << "  ";   // Indentation
 
     if (node->isLeaf()) {
-        cout << "Level " << level << ": Leaf node with " << node->points.size() << " points\n";
+        outFile << "Level " << level << ": Leaf node with " << node->points.size() << " points\n";
     }
     else {
-        cout << "Level " << level << ": Internal node\n";
+        outFile << "Level " << level << ": Internal node\n";
         for (int i=0; i<8; i++) {
-            visualizeNode(node->children[i], level+1);
+            visualizeNode(node->children[i], level+1, outFile);
         }
     }
+}
+
+
+void Octree::mergeUnderpopulatedNodes(OctreeNode* node, int depth, int startDepth) {
+    if (!node || node->isLeaf()) return; 
+
+    // bottom-up merge
+    for (int i = 0; i < 8; i++) {
+        mergeUnderpopulatedNodes(node->children[i], depth + 1, startDepth);
+    }
+    
+    if (depth >= startDepth) {
+        bool allChildrenAreLeaves = true;
+        int totalPoints = 0;
+        for (int i = 0; i < 8; ++i) {   // check if children are all leaves
+            if (node->children[i]) {
+                if (!node->children[i]->isLeaf()) {
+                    allChildrenAreLeaves = false;
+                    break;  // break if one child is not leaf (already checked-exceed max)
+                } else {
+                    totalPoints += node->children[i]->points.size();
+                }
+            }
+        }
+
+        if (allChildrenAreLeaves && totalPoints <= maxPointsPerNode * 2) {
+            vector<Point> mergedPoints;
+            for (int i = 0; i < 8; ++i) {
+                if (node->children[i]) {
+                    mergedPoints.insert(mergedPoints.end(), node->children[i]->points.begin(), node->children[i]->points.end());
+                    delete node->children[i];
+                    node->children[i] = nullptr;
+                }
+            }
+            node->points = mergedPoints;  
+            node->convertToLeaf();  
+        }
+    }
+
 }

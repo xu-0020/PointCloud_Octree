@@ -1,4 +1,4 @@
-#include <vector>
+#include <fstream>
 #include "OctreeNode.h"
 using namespace std;
 
@@ -8,6 +8,7 @@ private:
     OctreeNode* root;
     int maxDepth;
     int maxPointsPerNode;
+    int minPointsPerNode;
     int depthAdjustmentFactor;
 
     // Function to determine the child index for a point
@@ -18,11 +19,14 @@ private:
     
     void subdivideAndInsert(OctreeNode* node, Point& point, int depth);
 
+    // Function to merge underpopulated leaf nodes
+    void mergeUnderpopulatedNodes(OctreeNode* node, int depth, int startDepth);
+
     // Function to visualize built node in the Octree
-    void visualizeNode(OctreeNode* node, int level);
+    void visualizeNode(OctreeNode* node, int level, ofstream& outFile);
 
 public:
-    Octree(Point origin, float initialSize, int maxDepth, int maxPoints, int depthFactor) : maxDepth(maxDepth), maxPointsPerNode(maxPoints), depthAdjustmentFactor(depthFactor) {
+    Octree(Point origin, float initialSize, int maxDepth, int maxPoints, int minPoints, int depthFactor) : maxDepth(maxDepth), maxPointsPerNode(maxPoints), minPointsPerNode(minPoints), depthAdjustmentFactor(depthFactor) {
         root = new OctreeNode(origin, initialSize);
     }
 
@@ -34,8 +38,19 @@ public:
         insert(root, point, 0);
     }
 
+    void trim(int startDepth) {
+        mergeUnderpopulatedNodes(root, 0, startDepth);
+    }
+
     // Function to visualize octree
-    void visualize() {
-        visualizeNode(root, 0);
+    void visualize(string trialNum) {
+        ofstream outFile(trialNum + " octree.txt");
+        if (!outFile.is_open()) {
+            cerr << "Failed to open file for writing.\n";
+            return;
+        }
+
+        visualizeNode(root, 0, outFile);
+        outFile.close();
     }
 };

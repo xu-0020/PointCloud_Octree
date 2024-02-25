@@ -124,15 +124,21 @@ int main() {
     float initialSize = bounds.getSize();   
 
     // Variable settings
-    int maxDepth = 6;
-    int maxPointsPerNode = 30000;
+    int maxDepth = 10;
+    int maxPointsPerNode = 12000;
+    int minPointsPerNode = 8000;
     int depthAdjustmentFactor = 10000;
 
     // Build Octree
-    Octree octree(origin, initialSize, maxDepth, maxPointsPerNode, depthAdjustmentFactor);
+    Octree octree(origin, initialSize, maxDepth, maxPointsPerNode, minPointsPerNode, depthAdjustmentFactor);
     buildOctreeFromCSV(filenames, octree);
 
-    octree.visualize();
+    octree.visualize("1");
+
+    // Trim octree
+    octree.trim(maxDepth/2);
+
+    octree.visualize("2");
 
     return 0;
 }
