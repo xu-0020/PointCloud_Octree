@@ -1,4 +1,6 @@
 #include <iostream>
+#include <algorithm>
+
 #include "Octree.h"
 
 
@@ -18,7 +20,7 @@ void Octree::insert(OctreeNode* node, Point& point, int depth) {
             node->points.push_back(point);
             return;
         }
-        // Subdivide the node if it exceeds capacity and depth limit
+        // Subdivide the node if it exceeds capacity and within depth limit
         for (Point p : node->points) {
             subdivideAndInsert(node, p, depth);     // Reinsert existing points in the current node
         }
@@ -89,7 +91,7 @@ void Octree::mergeUnderpopulatedNodes(OctreeNode* node, int depth, int startDept
             }
         }
 
-        if (allChildrenAreLeaves && totalPoints <= maxPointsPerNode * 2) {
+        if (allChildrenAreLeaves && totalPoints <= maxPointsPerNode * 1.5) {    // if all children combined have less than 1.5*max threshold, merge
             vector<Point> mergedPoints;
             for (int i = 0; i < 8; ++i) {
                 if (node->children[i]) {
@@ -100,6 +102,51 @@ void Octree::mergeUnderpopulatedNodes(OctreeNode* node, int depth, int startDept
             }
             node->points = mergedPoints;  
             node->convertToLeaf();  
+        }
+        
+        else if (allChildrenAreLeaves) {    // if some children combined have less than max threshold, combine them
+            // sort children
+            vector<pair<int, int>> childPointCounts;
+            for (int i = 0; i < 8; ++i) {
+                if (node->children[i]) {
+                    childPointCounts.push_back(pair(node->children[i]->points.size(), i));
+                }
+            }   
+            sort(childPointCounts.begin(), childPointCounts.end()); // Sort the vector by point count in ascending order
+
+            vector<Point> mergedPoints;
+            vector<OctreeNode*> newLeafNodes;
+
+            for (auto& [pointCount, index] : childPointCounts) {
+                if (mergedPoints.size() + pointCount > maxPointsPerNode * 1.2) {    // Newly merged exceed the max limit
+                    OctreeNode* newLeaf = new OctreeNode(node->origin, node->size);
+                    newLeaf->points = mergedPoints;  // Move the merged points to the new leaf node
+                    newLeaf->convertToLeaf();
+                    newLeafNodes.push_back(newLeaf);    // Add node
+                    mergedPoints.clear();
+                }
+                mergedPoints.insert(mergedPoints.end(), node->children[index]->points.begin(), node->children[index]->points.end());
+                delete node->children[index]; 
+                node->children[index] = nullptr;
+            }
+
+            // Handle remaining merged points
+            if (!mergedPoints.empty()) {
+                OctreeNode* newLeaf = new OctreeNode(node->origin, node->size);
+                newLeaf->points = mergedPoints;
+                newLeaf->convertToLeaf();
+                newLeafNodes.push_back(newLeaf);
+            }
+
+            // Reinsert any remaining children after the merged one
+            for (size_t i = 0; i < newLeafNodes.size(); i++) {
+                node->children[i] = newLeafNodes[i];
+            }
+
+            // Clear any remaining child pointers
+            for (size_t i = newLeafNodes.size(); i < 8; ++i) {
+                node->children[i] = nullptr;
+            }
         }
     }
 

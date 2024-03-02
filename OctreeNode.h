@@ -22,9 +22,11 @@ struct OctreeNode {
     }
 
     void convertToLeaf() {
-        for (int i = 0; i < 8; ++i) {
-            delete children[i];
-            children[i] = nullptr;
+        for (int i = 0; i < 8; i++) {
+            if (children[i]) {
+                delete children[i];
+                children[i] = nullptr;
+            }
         }
     }
 };
