@@ -3,7 +3,6 @@
 
 #include "Octree.h"
 
-
 int Octree::getOctant(const Point& origin, Point& point) {  
     int octant = 0;
     if (point.x >= origin.x) octant |= 4;       // The third bit (from the right, 0-indexed) of octant is set 
@@ -33,20 +32,11 @@ void Octree::insert(OctreeNode* node, Point& point, int depth) {
 }
 
 void Octree::subdivideAndInsert(OctreeNode* node, Point& point, int depth) {
-    int octant = getOctant(node->origin, point);
+    int octant = getOctant(node->bound.getCenter(), point);
     
     if (node->children[octant] == nullptr) {
-        float newSize = node->size / 2.0f;
-        // Move origin to the determined octant
-        Point newOrigin = node->origin;     
-        if (octant & 4) newOrigin.x += newSize / 2.0f;
-        else newOrigin.x -= newSize / 2.0f;
-        if (octant & 2) newOrigin.y += newSize / 2.0f;
-        else newOrigin.y -= newSize / 2.0f;
-        if (octant & 1) newOrigin.z += newSize / 2.0f;
-        else newOrigin.z -= newSize / 2.0f;
-        
-        node->children[octant] = new OctreeNode(newOrigin, newSize);
+        Bounds childBounds = calculateChildBounds(node->bound, octant);
+        node->children[octant] = new OctreeNode(childBounds);
     }
     insert(node->children[octant], point, depth + 1);
 }
@@ -93,21 +83,26 @@ void Octree::mergeUnderpopulatedNodes(OctreeNode* node, int depth, int startDept
 
         if (allChildrenAreLeaves && totalPoints <= maxPointsPerNode * 1.5) {    // if all children combined have less than 1.5*max threshold, merge
             vector<Point> mergedPoints;
-            for (int i = 0; i < 8; ++i) {
+            Bounds mergedBounds;
+            for (int i = 0; i < 8; i++) {
                 if (node->children[i]) {
                     mergedPoints.insert(mergedPoints.end(), node->children[i]->points.begin(), node->children[i]->points.end());
+                    for (Point& point : node->children[i]->points) {
+                        mergedBounds.update(point);
+                    }
                     delete node->children[i];
                     node->children[i] = nullptr;
                 }
             }
             node->points = mergedPoints;  
+            node->bound = mergedBounds;
             node->convertToLeaf();  
         }
         
         else if (allChildrenAreLeaves) {    // if some children combined have less than max threshold, combine them
             // sort children
             vector<pair<int, int>> childPointCounts;
-            for (int i = 0; i < 8; ++i) {
+            for (int i = 0; i < 8; i++) {
                 if (node->children[i]) {
                     childPointCounts.push_back(pair(node->children[i]->points.size(), i));
                 }
@@ -116,23 +111,28 @@ void Octree::mergeUnderpopulatedNodes(OctreeNode* node, int depth, int startDept
 
             vector<Point> mergedPoints;
             vector<OctreeNode*> newLeafNodes;
+            Bounds mergedBounds;
 
             for (auto& [pointCount, index] : childPointCounts) {
                 if (mergedPoints.size() + pointCount > maxPointsPerNode * 1.2) {    // Newly merged exceed the max limit
-                    OctreeNode* newLeaf = new OctreeNode(node->origin, node->size);
+                    OctreeNode* newLeaf = new OctreeNode(mergedBounds);
                     newLeaf->points = mergedPoints;  // Move the merged points to the new leaf node
                     newLeaf->convertToLeaf();
                     newLeafNodes.push_back(newLeaf);    // Add node
                     mergedPoints.clear();
+                    mergedBounds = Bounds();
                 }
                 mergedPoints.insert(mergedPoints.end(), node->children[index]->points.begin(), node->children[index]->points.end());
+                for (Point& point : node->children[index]->points) {
+                    mergedBounds.update(point);
+                }
                 delete node->children[index]; 
                 node->children[index] = nullptr;
             }
 
             // Handle remaining merged points
             if (!mergedPoints.empty()) {
-                OctreeNode* newLeaf = new OctreeNode(node->origin, node->size);
+                OctreeNode* newLeaf = new OctreeNode(mergedBounds);
                 newLeaf->points = mergedPoints;
                 newLeaf->convertToLeaf();
                 newLeafNodes.push_back(newLeaf);
@@ -150,4 +150,59 @@ void Octree::mergeUnderpopulatedNodes(OctreeNode* node, int depth, int startDept
         }
     }
 
+}
+
+void Octree::rangeQuery(Bounds& queryRange, vector<Point>& results, OctreeNode* node, int depth) {
+    // Check if the current node's bounds intersect with the query range
+    if (!node->bound.intersects(queryRange)) {
+        return;
+    }
+
+    if (node->isLeaf()) {
+        // If it's a leaf node, check each point
+        for (const Point& point : node->points) {
+            if (queryRange.contains(point)) {
+                results.push_back(point);
+            }
+        }
+    } else {
+        for (int i = 0; i < 8; ++i) {
+            if (node->children[i]) {
+                rangeQuery(queryRange, results, node->children[i], depth + 1);
+            }
+        }
+    }
+}
+
+
+Bounds Octree::calculateChildBounds(Bounds& parentBounds, int octant) {
+    Point center = parentBounds.getCenter();
+    Point min = parentBounds.min;
+    Point max = parentBounds.max;
+    Point childMin, childMax;
+
+    // Calculate min and max points for the child bounds based on the octant
+    if (octant & 4) {
+        childMin.x = center.x;
+        childMax.x = max.x;
+    } else {
+        childMin.x = min.x;
+        childMax.x = center.x;
+    }
+    if (octant & 2) {
+        childMin.y = center.y;
+        childMax.y = max.y;
+    } else {
+        childMin.y = min.y;
+        childMax.y = center.y;
+    }
+    if (octant & 1) {
+        childMin.z = center.z;
+        childMax.z = max.z;
+    } else {
+        childMin.z = min.z;
+        childMax.z = center.z;
+    }
+
+    return Bounds(childMin, childMax);
 }

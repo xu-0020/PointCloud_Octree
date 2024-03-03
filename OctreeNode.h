@@ -1,14 +1,14 @@
 #include <vector>
 #include "Point.h"
+#include "Bound.h"
 
 
 struct OctreeNode {
-    Point origin;                               // Centroid point
-    float size;                                 // Length of the side of the cubic node
+    Bounds bound;                               // Bounding box of the node
     vector<Point> points;                       // Points contained in this node
     OctreeNode* children[8] = {nullptr};        // Pointers to octants
 
-    OctreeNode(Point o, float s) : origin(o), size(s) {}
+    OctreeNode(const Bounds& b) : bound(b) {}
 
     ~OctreeNode() {
         for (auto& child : children) {

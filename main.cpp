@@ -2,7 +2,6 @@
 #include <fstream>
 #include <sstream>
 
-#include "Bound.h"
 #include "Octree.h"
 using namespace std;
 
@@ -127,18 +126,27 @@ int main() {
     int maxDepth = 10;
     int maxPointsPerNode = 12000;
     int minPointsPerNode = 8000;
-    int depthAdjustmentFactor = 10000;
 
     // Build Octree
-    Octree octree(origin, initialSize, maxDepth, maxPointsPerNode, minPointsPerNode, depthAdjustmentFactor);
+    Octree octree(bounds, maxDepth, maxPointsPerNode, minPointsPerNode);
     buildOctreeFromCSV(filenames, octree);
-
-    octree.visualize("1");
 
     // Trim octree
     octree.trim(maxDepth/2);
 
-    octree.visualize("2");
+    // octree.visualize("Octree Structure");
+
+    // Range query
+    Bounds queryRange;
+    queryRange.min = Point(bounds.getCenter().x - 2, bounds.getCenter().y - 2, bounds.getCenter().z - 2); 
+    queryRange.max = Point(bounds.getCenter().x + 2, bounds.getCenter().y + 2, bounds.getCenter().z + 2);  
+    vector<Point> queryResults;
+    octree.executeRangeQuery(queryRange, queryResults);
+
+    cout << "Points within the query range:" << endl;
+    for (Point& point : queryResults) {
+        cout << "Point(" << point.x << ", " << point.y << ", " << point.z << ")" << endl;
+    }
 
     return 0;
 }
