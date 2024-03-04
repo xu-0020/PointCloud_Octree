@@ -9,6 +9,7 @@ using namespace std;
 namespace fs = filesystem;
 
 
+// Octree functions
 Bounds computeBoundingBoxFromCSV(const vector<string>& filenames) {
     Bounds bounds;
     bool firstPoint = true;
@@ -49,7 +50,6 @@ Bounds computeBoundingBoxFromCSV(const vector<string>& filenames) {
     return bounds;
 }
 
-
 void buildOctreeFromCSV(const vector<string>& filenames, Octree& octree) {
     for (auto& filename : filenames) {
         ifstream file(filename);
@@ -78,6 +78,7 @@ void buildOctreeFromCSV(const vector<string>& filenames, Octree& octree) {
         }
     }
 }
+// End of Octree functions
 
 
 int main() {
@@ -134,12 +135,14 @@ int main() {
     // Trim octree
     octree.trim(maxDepth/2);
 
+    octree.buildRtrees();
+
     // octree.visualize("Octree Structure");
 
     // Range query
     Bounds queryRange;
-    queryRange.min = Point(bounds.getCenter().x - 2, bounds.getCenter().y - 2, bounds.getCenter().z - 2); 
-    queryRange.max = Point(bounds.getCenter().x + 2, bounds.getCenter().y + 2, bounds.getCenter().z + 2);  
+    queryRange.min = Point(bounds.getCenter().x - 15, bounds.getCenter().y - 15, bounds.getCenter().z - 15); 
+    queryRange.max = Point(bounds.getCenter().x + 15, bounds.getCenter().y + 15, bounds.getCenter().z + 15);  
     vector<Point> queryResults;
     octree.executeRangeQuery(queryRange, queryResults);
 
@@ -147,7 +150,7 @@ int main() {
     for (Point& point : queryResults) {
         cout << "Point(" << point.x << ", " << point.y << ", " << point.z << ")" << endl;
     }
-
+    
     return 0;
 }
 

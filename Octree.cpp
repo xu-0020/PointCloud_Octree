@@ -3,6 +3,31 @@
 
 #include "Octree.h"
 
+// R-tree functions
+void RInsert(RTreePoints* tree, vector<Point> points){
+    if (points.size()==0){
+        return;
+    }
+    for (Point point : points){
+        // Point* pointer = new Point();
+        tree->Insert(point.arr, point.arr, point);
+    }
+}
+
+bool MySearchCallback(ValueType point)
+{
+//   point.print_point();
+  return true; // keep going
+}
+
+void RSearch(RTreePoints* tree, std::vector<Point>& results, Bounds& queryRange){
+    
+    tree->Search(queryRange.min.arr, queryRange.max.arr, results, MySearchCallback);
+    return;
+}
+// End of R-tree functions
+
+
 int Octree::getOctant(const Point& origin, Point& point) {  
     int octant = 0;
     if (point.x >= origin.x) octant |= 4;       // The third bit (from the right, 0-indexed) of octant is set 
@@ -10,8 +35,6 @@ int Octree::getOctant(const Point& origin, Point& point) {
     if (point.z >= origin.z) octant |= 1;       // The first bit (from the right, 0-indexed) of octant is set 
     return octant;      // 8 possible results from 3 bits 000 to 111 representing 8 octants
 }
-
-
 
 void Octree::insert(OctreeNode* node, Point& point, int depth) {
     if (node->isLeaf()) {
@@ -41,7 +64,7 @@ void Octree::subdivideAndInsert(OctreeNode* node, Point& point, int depth) {
     insert(node->children[octant], point, depth + 1);
 }
 
-
+/* Not usable with R-tree
 void Octree::visualizeNode(OctreeNode* node, int level, ofstream& outFile) {
     if (!node) return;
 
@@ -57,6 +80,7 @@ void Octree::visualizeNode(OctreeNode* node, int level, ofstream& outFile) {
         }
     }
 }
+*/
 
 
 void Octree::mergeUnderpopulatedNodes(OctreeNode* node, int depth, int startDepth) {
@@ -70,7 +94,7 @@ void Octree::mergeUnderpopulatedNodes(OctreeNode* node, int depth, int startDept
     if (depth >= startDepth) {
         bool allChildrenAreLeaves = true;
         int totalPoints = 0;
-        for (int i = 0; i < 8; ++i) {   // check if children are all leaves
+        for (int i = 0; i < 8; i++) {   // check if children are all leaves
             if (node->children[i]) {
                 if (!node->children[i]->isLeaf()) {
                     allChildrenAreLeaves = false;
@@ -144,7 +168,7 @@ void Octree::mergeUnderpopulatedNodes(OctreeNode* node, int depth, int startDept
             }
 
             // Clear any remaining child pointers
-            for (size_t i = newLeafNodes.size(); i < 8; ++i) {
+            for (size_t i = newLeafNodes.size(); i < 8; i++) {
                 node->children[i] = nullptr;
             }
         }
@@ -159,14 +183,15 @@ void Octree::rangeQuery(Bounds& queryRange, vector<Point>& results, OctreeNode* 
     }
 
     if (node->isLeaf()) {
-        // If it's a leaf node, check each point
-        for (const Point& point : node->points) {
-            if (queryRange.contains(point)) {
-                results.push_back(point);
-            }
-        }
-    } else {
-        for (int i = 0; i < 8; ++i) {
+        // If it's a leaf node, query the R-tree
+        if (node->rtree) {
+            vector<Point> rtreeResults;
+            RSearch(node->rtree, rtreeResults, queryRange);
+            results.insert(results.end(), rtreeResults.begin(), rtreeResults.end());
+        } 
+    } 
+    else {
+        for (int i = 0; i < 8; i++) {
             if (node->children[i]) {
                 rangeQuery(queryRange, results, node->children[i], depth + 1);
             }
@@ -205,4 +230,18 @@ Bounds Octree::calculateChildBounds(Bounds& parentBounds, int octant) {
     }
 
     return Bounds(childMin, childMax);
+}
+
+void Octree::initializeRTrees(OctreeNode* node) {
+    if (node->isLeaf()) {
+        node->rtree = new RTreePoints();
+        RInsert(node->rtree, node->points);
+    } 
+    else {
+        for (int i = 0; i < 8; i++) {
+            if (node->children[i]) {
+                initializeRTrees(node->children[i]);
+            }
+        }
+    }
 }
