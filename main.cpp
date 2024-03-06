@@ -120,6 +120,8 @@ int main() {
 
     // Compute the bounding box 
     Bounds bounds = computeBoundingBoxFromCSV(filenames);
+    // bounds.min.print_point();
+    // bounds.max.print_point();
     Point origin = bounds.getCenter();       
     float initialSize = bounds.getSize();   
 
@@ -138,11 +140,15 @@ int main() {
     octree.buildRtrees();
 
     // octree.visualize("Octree Structure");
-
+    
     // Range query
     Bounds queryRange;
-    queryRange.min = Point(bounds.getCenter().x - 15, bounds.getCenter().y - 15, bounds.getCenter().z - 15); 
-    queryRange.max = Point(bounds.getCenter().x + 15, bounds.getCenter().y + 15, bounds.getCenter().z + 15);  
+    queryRange.min = Point(298336, 30.777, -5.04311e+06); 
+    queryRange.max = Point(299664, 123.083, -5.04192e+06);  
+    // float range = 15;
+    
+    // queryRange.min = Point(bounds.getCenter().x - range, bounds.getCenter().y - range, bounds.getCenter().z - range); 
+    // queryRange.max = Point(bounds.getCenter().x + range, bounds.getCenter().y + range, bounds.getCenter().z + range);  
     vector<Point> queryResults;
     octree.executeRangeQuery(queryRange, queryResults);
 

@@ -21,6 +21,6 @@ struct Point {
         this->arr[2] = z;
     }
     void print_point(){
-        cout<< "x = " <<x << " y = " << y << " z = " << z << " r = " << r << " g = " << g << " b = " << b <<endl;
+        cout << "x = " <<x << " y = " << y << " z = " << z << " r = " << r << " g = " << g << " b = " << b << endl;
     }
 };
