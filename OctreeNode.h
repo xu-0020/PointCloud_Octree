@@ -20,6 +20,7 @@ struct OctreeNode {
             child = nullptr;
         }
         delete rtree; 
+        rtree = nullptr;
     }
 
     bool isLeaf() const {
@@ -33,9 +34,5 @@ struct OctreeNode {
                 children[i] = nullptr;
             }
         }
-        if (!rtree) {
-            rtree = new RTreePoints();
-        }
     }
-
 };
