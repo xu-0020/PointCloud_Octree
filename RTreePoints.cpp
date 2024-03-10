@@ -42,8 +42,8 @@ int main(){
     points.push_back(tmp_2);
 
     RInsert(tree, points);
-    auto list = tree->ListTree();
-    int counter = 0;
+    // auto list = tree->ListTree();
+    // int counter = 0;
     // for (auto aabb : list) {
     // cout << "TreeList [" << counter++ << "]: "
     //     << aabb.m_min[0] << ", "

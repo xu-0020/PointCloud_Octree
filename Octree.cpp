@@ -12,6 +12,17 @@ void RInsert(RTreePoints* tree, const vector<Point>& points){
         // Point* pointer = new Point();
         tree->Insert(point.arr, point.arr, point);
     }
+    // auto list = tree->ListTree();
+    // int counter = 0;
+    // for (auto aabb : list) {
+    // cout << "TreeList [" << counter++ << "]: "
+    //     << aabb.m_min[0] << ", "
+    //     << aabb.m_min[1] << ", "
+    //     << aabb.m_min[2] << "; "
+    //     << aabb.m_max[0] << ", "
+    //     << aabb.m_max[1] << ", "
+    //     << aabb.m_max[2] << endl;
+    // }
 }
 
 bool MySearchCallback(ValueType point)
@@ -21,8 +32,24 @@ bool MySearchCallback(ValueType point)
 }
 
 void RSearch(RTreePoints* tree, std::vector<Point>& results, Bounds& queryRange){
-    
+    auto list = tree->ListTree();
+    int counter = 0;
+    // for (auto aabb : list) {
+    // cout << "TreeList [" << counter++ << "]: "
+    //     << aabb.m_min[0] << ", "
+    //     << aabb.m_min[1] << ", "
+    //     << aabb.m_min[2] << "; "
+    //     << aabb.m_max[0] << ", "
+    //     << aabb.m_max[1] << ", "
+    //     << aabb.m_max[2] << endl;
+    // }
+    // queryRange.min.print_point();
+    // queryRange.max.print_point();
+    // cout<<endl<<endl;
     tree->Search(queryRange.min.arr, queryRange.max.arr, results, MySearchCallback);
+    // for (Point point : results){
+    //     point.print_point();
+    // }
     return;
 }
 // End of R-tree functions
