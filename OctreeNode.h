@@ -1,4 +1,6 @@
 #include <vector>
+#include <future>
+
 #include "Point.h"
 #include "Bound.h"
 #include "RTree.h"
