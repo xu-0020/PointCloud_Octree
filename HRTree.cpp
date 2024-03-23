@@ -199,9 +199,24 @@ public:
 
 
 int main(){
-
+    // Read in data.
+    cout << "----------------------------------Reading data---------------------------------" << endl; 
     vector<Point> points = GetDataFromSingleCSV("/home/hjingaa/github/PointCloud_Octree/data_csv/whampoa_1223.csv");
+    
+    // Get the summary data.
+    cout << "----------------------------------Process data summary---------------------------------" << endl; 
     std::unordered_map<std::string, float> map = Summary(points);
+    // Print the summary data.
+    cout<< "maxTime = " << map["maxTime"] << " " << "minTime = " << map["minTime"] << " " << "maxX = " << map["maxX"] << " " << "minX = " << map["minX"] << " " << "maxY = " << map["maxY"] << " " << "minY = " << map["minY"] << " " << "maxZ = " << map["maxZ"] << " " << "minZ = " << map["minZ"] << " " << endl;
+    // compute the fixed bound.
+    Point Cmin = Point(5.0 / 8 * map["minX"] + 3.0 / 8 * map["maxX"], 5.0 / 8 * map["minY"] + 3.0 / 8 * map["minY"], 5.0 / 8 * map["minZ"] + 3.0 / 8 * map["minZ"]);
+    Point Cmax = Point(3.0 / 8 * map["minX"] + 5.0 / 8 * map["maxX"], 3.0 / 8 * map["minY"] + 5.0 / 8 * map["minY"], 3.0 / 8 * map["minZ"] + 5.0 / 8 * map["minZ"]);
+    Bounds fixedBound = Bounds(Cmin, Cmax);
+    // Compute the fixed time query
+    float Tmin = 5.0 / 8 * map["minTime"] + 3.0 / 8 * map["maxTime"];
+    float Tmax = 3.0 / 8 * map["minTime"] + 5.0 / 8 * map["maxTime"];
+
+
     // vector<Point> points; 
     // Point tmp = Point(1.1, 2, 3, 1.1, 1.1, 1.1, "", 1.1);
     // points.push_back(tmp);
@@ -212,14 +227,51 @@ int main(){
     // // for (Point point : points){
     // //     cout<< point.time;
     // // }
+
+
+
+    // Coodinate test.
     HRTree* tree = new HRTree(points);
-    // // tree->print_tree();
-    std::vector<Point> results;
-    Point min = Point(0,0,0);
-    Point max = Point(15,15,15);
-    Bounds bound = Bounds(min, max);
-    tree->HRTreeSearch(1.2, 1.2, results, bound);
-    for (Point point : results) point.print_point();
+    cout << "----------------------------------Begin the experiments---------------------------------" << endl; 
+    std::map<string, float> time_cost_map;
+    for (float i = 1.0; i < 100; i++){
+        std::vector<Point> results;
+        
+        // Compoute the bound in this loop.
+        float tmp_minX = (100.0+i) / 200.0 * map["minX"] + (100.0-i) / 200.0 * map["maxX"];
+        float tmp_maxX = (100.0-i) / 200.0 * map["minX"] + (100.0+i) / 200.0 * map["maxX"];
+        float tmp_minY = (100.0+i) / 200.0 * map["minY"] + (100.0-i) / 200.0 * map["maxY"];
+        float tmp_maxY = (100.0-i) / 200.0 * map["minY"] + (100.0+i) / 200.0 * map["maxY"];
+        float tmp_minZ = (100.0+i) / 200.0 * map["minZ"] + (100.0-i) / 200.0 * map["maxZ"];
+        float tmp_maxZ = (100.0-i) / 200.0 * map["minZ"] + (100.0+i) / 200.0 * map["maxZ"];
+        Point pmin = Point(tmp_minX, tmp_minY, tmp_minZ);
+        Point pmax = Point(tmp_maxX, tmp_maxY, tmp_maxZ);
+        Bounds bound = Bounds(pmin, pmax);
+        cout << "The bound is (" << tmp_minX << ", " << tmp_maxX << "), (" << tmp_minY << ", " << tmp_maxY << "), (" << tmp_minZ << ", " << tmp_maxZ << ") " << endl;
+        auto startTime = std::chrono::high_resolution_clock::now();
+        tree->HRTreeSearch(Tmin, Tmax, results, bound);
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        // Make the bounds words
+        string bound_words = "The bound is (" + to_string(tmp_minX) + ", " + to_string(tmp_maxX) + "), (" + to_string(tmp_minY) + ", " + to_string(tmp_maxY) + "), (" + to_string(tmp_minZ) + ", " + to_string(tmp_maxZ) + ") with time bound (" + to_string(Tmin) + ", " + to_string(Tmax) + ").";
+        time_cost_map[bound_words] = duration.count();
+    }
+    
+
+
+    // Time query test.
+
+
+
+    // // Some test.
+    // HRTree* tree = new HRTree(points);
+    // // // tree->print_tree();
+    // std::vector<Point> results;
+    // Point min = Point(0,0,0);
+    // Point max = Point(15,15,15);
+    // Bounds bound = Bounds(min, max);
+    // tree->HRTreeSearch(1.2, 1.2, results, bound);
+    // for (Point point : results) point.print_point();
 
 
 
