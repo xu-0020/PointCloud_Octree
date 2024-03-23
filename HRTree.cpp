@@ -1,26 +1,22 @@
 #include "RTreePoints.h"
+#include <map>
+
 
 class RTreeNode {
 public: 
     float time;
     RTreePoints* tree;
-    RTreeNode* next;
-    RTreeNode(Point point, RTreeNode* next=nullptr): time(point.time), next(next){
+    RTreeNode(vector<Point> points): time(points.front().time) {
         this->tree = new RTreePoints;
-        RInsertPoint(this->tree, point);
-
-        
+        RInsert(this->tree, points);
     }
     ~RTreeNode(){
         delete this->tree;
         this->tree = nullptr;
-        delete this->next;
-        this->next = nullptr;
     }
-    void HRTreeNodeInsert(Point point){
-        RInsertPoint(this->tree, point);
-        cout<<"buggggggggg"<<endl;
-    }
+    // void HRTreeNodeInsert(Point point){
+    //     RInsertPoint(this->tree, point);
+    // }
     void HRSearch(std::vector<Point>& results, Bounds& queryRange){
         RSearch(this->tree, results, queryRange);
         return;
@@ -41,114 +37,74 @@ public:
         return;
     }
 };
+
+bool compareByAttribute(RTreeNode& obj1, RTreeNode& obj2) {
+    return obj1.time < obj2.time;
+}
+bool compareByPoints(Point& obj1, Point& obj2) {
+    return obj1.time < obj2.time;
+}
+
 class HRTree {
 private:
-    RTreeNode* head;
-    RTreeNode* findPointTree(float time){
-        //TO DO
-        if (this->head == nullptr) {
-            return nullptr;  // 链表为空
-        }
-        RTreeNode* current = this->head;
-        while (current != nullptr && current->time != time) {
-            current = current->next;
-        }
-        return current;
-    }
-    RTreeNode* findLastNode() {
-        if (this->head == nullptr) {
-            return nullptr;  // 链表为空
-        }
-        RTreeNode* current = this->head;
-        while (current->next != nullptr) {
-            current = current->next;
-        }
-        return current;
-    }
-
+    std::map<float, RTreeNode*> trees;
 public: 
 
-    HRTree(): head(nullptr){}
     HRTree(vector<Point> points){
         if (points.empty()){
-            head = nullptr;
             return;
         }
-        for (Point point : points){
-            if (this->head==nullptr){
-                this->head = new RTreeNode(point);
-            }
-            else{
-                RTreeNode* tree = findPointTree(point.time);
-                if (tree) {tree->HRTreeNodeInsert(point);}
-                else{
-                    RTreeNode* current = findLastNode();
-                    current->next = new RTreeNode(point);
-                }
-            }
-            
+        std::sort(points.begin(), points.end(), compareByPoints);
+         // Group the elements based on 'attribute'
+        std::map<float, std::vector<Point>> groupedMap;
+        for (const Point& point : points) {
+            groupedMap[point.time].push_back(point);
         }
-    }
-    void HRTreeInsert(Point point){
-        if (this->head==nullptr){
-            this->head = new RTreeNode(point);
-        }
-        else{
-            RTreeNode* tree = findPointTree(point.time);
-            if (tree) tree->HRTreeNodeInsert(point);
-            else{
-                RTreeNode* current = findLastNode();
-                current->next = new RTreeNode(point);
-            }
+        for (const auto& entry : groupedMap) {
+            // cout<< entry.first;
+            this->trees[entry.first] = new RTreeNode(groupedMap[entry.first]);
         }
         return;
     }
     ~HRTree() {
-        RTreeNode* current = this->head;
-        while (current != nullptr) {
-            RTreeNode* temp = current;
-            current = current->next;
-            delete temp;
-        }
+        this->trees.clear();
     }
     void print_tree(){
-        if (this->head == nullptr) {
-            cout<<"empty tree"<<endl;
-            return;  // 链表为空
-        }
-        RTreeNode* current = this->head;
-        while (current != nullptr) {
-            current->print_tree_node();
-            current = current->next;
+        for (auto& entry : this->trees) {
+            entry.second->print_tree_node();
         }
         return;
     }
-    void HRTreeSearch(float time, std::vector<Point>& results, Bounds& queryRange){
-        RTreeNode* tree = findPointTree(time);
-        if(!tree) return;
-        tree->HRSearch(results, queryRange);
+    void HRTreeSearch(float start, float end, std::vector<Point>& results, Bounds& queryRange){
+        for (auto& entry : this->trees) {
+            if (entry.first >= start && entry.first <= end){
+                entry.second->HRSearch(results, queryRange);
+            }
+        }
         return;
     }
 };
 
 
 int main(){
-    // points.push_back(tmp);
-    // tmp = Point(1.2,2.5,3.1,1.2);
-    // points.push_back(tmp);
-    // tmp = Point(1.3,2.2,3.3,1.3);
-    // points.push_back(tmp);
-    // // for (Point point : points){
-    // //     cout<< point.time;
-    // // }
-    // HRTree* tree = new HRTree(points);
-    // // tree->print_tree();
-    // std::vector<Point> results;
-    // Point min = Point(0,0,0);
-    // Point max = Point(15,15,15);
-    // Bounds bound = Bounds(min, max);
-    // tree->HRTreeSearch(1.2, results, bound);
-    // for (Point point : results) point.print_point();
+    vector<Point> points; 
+    Point tmp = Point(1.1, 2, 3, 1.1, 1.1, 1.1, "", 1.1);
+    points.push_back(tmp);
+    tmp = Point(1.2, 2.5, 3.1, 1.2, 1.2, 1.2, "", 1.2);
+    points.push_back(tmp);
+    tmp = Point(1.3,2.2,3.3,1.3 ,1.3, 1.3, "", 1.3);
+    points.push_back(tmp);
+    // for (Point point : points){
+    //     cout<< point.time;
+    // }
+    HRTree* tree = new HRTree(points);
+    // tree->print_tree();
+    std::vector<Point> results;
+    Point min = Point(0,0,0);
+    Point max = Point(15,15,15);
+    Bounds bound = Bounds(min, max);
+    tree->HRTreeSearch(1.2, 1.2, results, bound);
+    for (Point point : results) point.print_point();
 
 
 
