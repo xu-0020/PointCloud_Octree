@@ -232,43 +232,43 @@ int main(){
     Point Cmax = Point(map["maxX"],map["maxY"],map["maxZ"]);
     Bounds fixedBound = Bounds(Cmin, Cmax);
     // Compute the fixed time query
-    float Tmin = map["minTime"];
-    float Tmax = map["maxTime"];
+    float Tmin = 7./10. *map["minTime"] + 3./10. * map["maxTime"];
+    float Tmax = 3./10. *map["minTime"] + 7./10. * map["maxTime"];
 
-    // // Build hrtree
-    // cout << "----------------------------------Build the hrtree---------------------------------" << endl; 
-    // startTime = std::chrono::high_resolution_clock::now();
-    // HRTree* tree = new HRTree(points);
-    // endTime = std::chrono::high_resolution_clock::now();
-    // duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-    // cout<< "Buiding the hrtree cost                        "  <<duration.count()<< "ms"<<endl;
+    // Build hrtree
+    cout << "----------------------------------Build the hrtree---------------------------------" << endl; 
+    startTime = std::chrono::high_resolution_clock::now();
+    HRTree* tree = new HRTree(points);
+    endTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    cout<< "Buiding the hrtree cost                        "  <<duration.count()<< "ms"<<endl;
 
-    // // HRTree Coordinate test.
-    // cout << "----------------------------------Begin the Coordinate experiments---------------------------------" << endl; 
-    // std::list<string> result_time_cost;
-    // for (float i = 1.0; i < 100; i++){
-    //     std::vector<Point> results;
+    // HRTree Coordinate test.
+    cout << "----------------------------------Begin the Coordinate experiments---------------------------------" << endl; 
+    std::list<string> result_time_cost;
+    for (float i = 1.0; i < 100; i++){
+        std::vector<Point> results;
         
-    //     // Compoute the bound in this loop.
-    //     float tmp_minX = (143.0+i * 57.0/100.0) / 200.0 * map["minX"] + (57.0-i * 57.0/100.0) / 200.0 * map["maxX"];
-    //     float tmp_maxX = (57.0-i * 57.0/100.0) / 200.0 * map["minX"] + (143.0+i * 57.0/100.0) / 200.0 * map["maxX"];
-    //     float tmp_minY = (143.0+i * 57.0/100.0) / 200.0 * map["minY"] + (57.0-i * 57.0/100.0) / 200.0 * map["maxY"];
-    //     float tmp_maxY = (57.0-i * 57.0/100.0) / 200.0 * map["minY"] + (143.0+i * 57.0/100.0) / 200.0 * map["maxY"];
-    //     float tmp_minZ = (143.0+i * 57.0/100.0) / 200.0 * map["minZ"] + (57.0-i * 57.0/100.0) / 200.0 * map["maxZ"];
-    //     float tmp_maxZ = (57.0-i * 57.0/100.0) / 200.0 * map["minZ"] + (143.0+i * 57.0/100.0) / 200.0 * map["maxZ"];
-    //     Point pmin = Point(tmp_minX, tmp_minY, tmp_minZ);
-    //     Point pmax = Point(tmp_maxX, tmp_maxY, tmp_maxZ);
-    //     Bounds bound = Bounds(pmin, pmax);
-    //     auto startTime = std::chrono::high_resolution_clock::now();
-    //     tree->HRTreeSearch(Tmin, Tmax, results, bound);
-    //     auto endTime = std::chrono::high_resolution_clock::now();
-    //     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
-    //     // Make the bounds words
-    //     string bound_words = "The bound is (" + to_string(tmp_minX) + ", " + to_string(tmp_maxX) + "), (" + to_string(tmp_minY) + ", " + to_string(tmp_maxY) + "), (" + to_string(tmp_minZ) + ", " + to_string(tmp_maxZ) + ") with time bound (" + to_string(Tmin) + ", " + to_string(Tmax) + ")." + " Time cost = " + to_string(duration.count())+" microseconds." + "find " + to_string(results.size()) + " points.";
-    //     result_time_cost.push_back(bound_words);
-    //     cout << bound_words << endl;
-    // }
-    // write_result("result/FtimeRVbound_HR.txt", result_time_cost);
+        // Compoute the bound in this loop.
+        float tmp_minX = (143.0+i * 57.0/100.0) / 200.0 * map["minX"] + (57.0-i * 57.0/100.0) / 200.0 * map["maxX"];
+        float tmp_maxX = (57.0-i * 57.0/100.0) / 200.0 * map["minX"] + (143.0+i * 57.0/100.0) / 200.0 * map["maxX"];
+        float tmp_minY = (143.0+i * 57.0/100.0) / 200.0 * map["minY"] + (57.0-i * 57.0/100.0) / 200.0 * map["maxY"];
+        float tmp_maxY = (57.0-i * 57.0/100.0) / 200.0 * map["minY"] + (143.0+i * 57.0/100.0) / 200.0 * map["maxY"];
+        float tmp_minZ = (143.0+i * 57.0/100.0) / 200.0 * map["minZ"] + (57.0-i * 57.0/100.0) / 200.0 * map["maxZ"];
+        float tmp_maxZ = (57.0-i * 57.0/100.0) / 200.0 * map["minZ"] + (143.0+i * 57.0/100.0) / 200.0 * map["maxZ"];
+        Point pmin = Point(tmp_minX, tmp_minY, tmp_minZ);
+        Point pmax = Point(tmp_maxX, tmp_maxY, tmp_maxZ);
+        Bounds bound = Bounds(pmin, pmax);
+        auto startTime = std::chrono::high_resolution_clock::now();
+        tree->HRTreeSearch(Tmin, Tmax, results, bound);
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+        // Make the bounds words
+        string bound_words = "The bound is (" + to_string(tmp_minX) + ", " + to_string(tmp_maxX) + "), (" + to_string(tmp_minY) + ", " + to_string(tmp_maxY) + "), (" + to_string(tmp_minZ) + ", " + to_string(tmp_maxZ) + ") with time bound (" + to_string(Tmin) + ", " + to_string(Tmax) + ")." + " Time cost = " + to_string(duration.count())+" microseconds." + "find " + to_string(results.size()) + " points.";
+        result_time_cost.push_back(bound_words);
+        cout << bound_words << endl;
+    }
+    write_result("result/FtimeRVbound_HR_2.txt", result_time_cost);
 
 
     // // HRTree Time test 
@@ -325,14 +325,14 @@ int main(){
     // }
     // write_result("result/RVbound_R.txt", result_time_cost);
 
-    // RTreeT Coordinate test
-    cout << "----------------------------------Build the RtreeT---------------------------------" << endl; 
-    startTime = std::chrono::high_resolution_clock::now();
-    RTreeT* RtreeT = new RTreeT;
-    RTInsert(RtreeT, points);
-    endTime = std::chrono::high_resolution_clock::now();
-    duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-    cout<< "Buiding the RtreeT cost                        "  <<duration.count()<< "ms"<<endl;
+    // // RTreeT Coordinate test
+    // cout << "----------------------------------Build the RtreeT---------------------------------" << endl; 
+    // startTime = std::chrono::high_resolution_clock::now();
+    // RTreeT* RtreeT = new RTreeT;
+    // RTInsert(RtreeT, points);
+    // endTime = std::chrono::high_resolution_clock::now();
+    // duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    // cout<< "Buiding the RtreeT cost                        "  <<duration.count()<< "ms"<<endl;
 
 
     // // Coordinate test.
@@ -362,28 +362,28 @@ int main(){
     // }
     // write_result("result/FtimeRVbound_RT.txt", result_time_cost);
 
-    // Time test.
-    // HRTree Time test 
-    cout << "----------------------------------Begin the Time experiments---------------------------------" << endl; 
-    std::list<string> result_time_cost;
-    for (float i = 1.0; i < 100; i++){
-        std::vector<Point> results;
-        float tmp_minT = (100.0+i) / 200.0 * map["minTime"] + (100.0-i) / 200.0 * map["maxTime"];
-        float tmp_maxT = (100.0-i) / 200.0 * map["minTime"] + (100.0+i) / 200.0 * map["maxTime"];
-        // Compoute the bound in this loop.
-        Point pmin = Point(map["minX"],map["minY"],map["minZ"], -1, -1, -1, "", tmp_minT);
-        Point pmax = Point(map["maxX"],map["maxY"],map["maxZ"], -1, -1, -1, "", tmp_maxT);
-        Bounds bound = Bounds(pmin, pmax);
-        auto startTime = std::chrono::high_resolution_clock::now();
-        RTSearch(RtreeT, results, bound);
-        auto endTime = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
-        // Make the bounds words
-        string bound_words = "The bound is (" + to_string(fixedBound.min.x) + ", " + to_string(fixedBound.max.x) + "), (" + to_string(fixedBound.min.y) + ", " + to_string(fixedBound.max.x) + "), (" + to_string(fixedBound.min.z) + ", " + to_string(fixedBound.max.x) + ") with time bound (" + to_string(tmp_minT) + ", " + to_string(tmp_maxT) + ")." + " Time cost = " + to_string(duration.count())+" microseconds." + "find " + to_string(results.size()) + " points.";
-        result_time_cost.push_back(bound_words);
-        cout << bound_words << endl;
-    }
-    write_result("result/FboundRVtime_RT.txt", result_time_cost);
+    // // Time test.
+    // // HRTree Time test 
+    // cout << "----------------------------------Begin the Time experiments---------------------------------" << endl; 
+    // std::list<string> result_time_cost;
+    // for (float i = 1.0; i < 100; i++){
+    //     std::vector<Point> results;
+    //     float tmp_minT = (100.0+i) / 200.0 * map["minTime"] + (100.0-i) / 200.0 * map["maxTime"];
+    //     float tmp_maxT = (100.0-i) / 200.0 * map["minTime"] + (100.0+i) / 200.0 * map["maxTime"];
+    //     // Compoute the bound in this loop.
+    //     Point pmin = Point(map["minX"],map["minY"],map["minZ"], -1, -1, -1, "", tmp_minT);
+    //     Point pmax = Point(map["maxX"],map["maxY"],map["maxZ"], -1, -1, -1, "", tmp_maxT);
+    //     Bounds bound = Bounds(pmin, pmax);
+    //     auto startTime = std::chrono::high_resolution_clock::now();
+    //     RTSearch(RtreeT, results, bound);
+    //     auto endTime = std::chrono::high_resolution_clock::now();
+    //     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+    //     // Make the bounds words
+    //     string bound_words = "The bound is (" + to_string(fixedBound.min.x) + ", " + to_string(fixedBound.max.x) + "), (" + to_string(fixedBound.min.y) + ", " + to_string(fixedBound.max.x) + "), (" + to_string(fixedBound.min.z) + ", " + to_string(fixedBound.max.x) + ") with time bound (" + to_string(tmp_minT) + ", " + to_string(tmp_maxT) + ")." + " Time cost = " + to_string(duration.count())+" microseconds." + "find " + to_string(results.size()) + " points.";
+    //     result_time_cost.push_back(bound_words);
+    //     cout << bound_words << endl;
+    // }
+    // write_result("result/FboundRVtime_RT.txt", result_time_cost);
 
 
 
