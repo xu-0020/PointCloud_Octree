@@ -18,13 +18,16 @@ private:
     void subdivideAndInsert(OctreeNode* node, Point& point, int depth);
 
     // Function to merge underpopulated leaf nodes
-    void mergeUnderpopulatedNodes(OctreeNode* node, int depth, int startDepth);
+    void mergeUnderpopulatedNodes(OctreeNode* node, int depth, const int startDepth);
 
     // Function to visualize built node in the Octree
     void visualizeNode(OctreeNode* node, int level, ofstream& outFile);
 
     // Function to calculate bounding box for each octants
     Bounds calculateChildBounds(Bounds& parentBounds, int octant);
+
+    // Function to recalculate bounds for a set of points (Regenerate for optimization)
+    Bounds calculateBoundsForPoints(const vector<Point>& points);
 
     // Range Query function
     void rangeQuery(Bounds& queryRange, vector<Point>& results, OctreeNode* node, int depth = 0);

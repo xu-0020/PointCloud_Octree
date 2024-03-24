@@ -173,22 +173,26 @@ int main() {
     }
 
 
-    /*
+    
     // Normal Processing
     
     // Variable settings
     int maxDepth = 7;
-    int maxPointsPerNode = 10000;
+    int maxPointsPerNode = 8000;
     Octree octree(bounds, maxDepth, maxPointsPerNode);
 
     buildOctreeFromCSV(filenames, octree);
 
+    octree.visualize("Octree Structure 1");
+
+
     // Trim octree
-    octree.trim(maxDepth/2);
+    octree.trim(maxDepth * (2/3));
 
-    octree.visualize("Octree Structure");
+    octree.visualize("Octree Structure 2");
 
-    
+    /*
+
     octree.buildRtrees();
 
     // Range query
@@ -204,7 +208,7 @@ int main() {
         cout << "Point: " << point.x << " " << point.y << " " << point.z << endl;
     }
 
-    */
+    
 
 
     
@@ -253,6 +257,8 @@ int main() {
         }
     }
     csvFile.close();
+
+    */
 
     return 0;
 }

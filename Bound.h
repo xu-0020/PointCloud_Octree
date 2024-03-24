@@ -1,5 +1,7 @@
 #include <vector>
 #include <algorithm>
+#include <cmath> 
+
 #include "Point.h"
 
 
@@ -21,7 +23,7 @@ struct Bounds {
         max.z = std::max(max.z, point.z);
     }
 
-    Point getCenter() {
+    Point getCenter() const {
         return Point(
             (min.x + max.x) / 2.0f,
             (min.y + max.y) / 2.0f,
@@ -47,6 +49,18 @@ struct Bounds {
         return (point.x >= min.x && point.x <= max.x) &&
                (point.y >= min.y && point.y <= max.y) &&
                (point.z >= min.z && point.z <= max.z);
+    }
+
+    // Method to compute the distance between the centers of two Bounds
+    float distanceTo(const Bounds& other) const {
+        Point center1 = this->getCenter();
+        Point center2 = other.getCenter();
+
+        float dx = center1.x - center2.x;
+        float dy = center1.y - center2.y;
+        float dz = center1.z - center2.z;
+
+        return std::sqrt(dx * dx + dy * dy + dz * dz);
     }
 };
 

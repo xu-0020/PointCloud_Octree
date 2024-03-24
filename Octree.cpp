@@ -2,6 +2,7 @@
 #include <algorithm>
 
 #include "Octree.h"
+#include <string.h>
 
 const size_t max_concurrent_tasks = 30;     // concurrency control for building r-trees
 
@@ -112,7 +113,6 @@ void Octree::visualizeNode(OctreeNode* node, int level, ofstream& outFile) {
 }
 
 
-
 void Octree::mergeUnderpopulatedNodes(OctreeNode* node, int depth, int startDepth) {
     if (!node || node->isLeaf()) return; 
 
@@ -121,92 +121,153 @@ void Octree::mergeUnderpopulatedNodes(OctreeNode* node, int depth, int startDept
         mergeUnderpopulatedNodes(node->children[i], depth + 1, startDepth);
     }
     
-    if (depth >= startDepth) {
-        bool allChildrenAreLeaves = true;
-        int totalPoints = 0;
-        for (int i = 0; i < 8; i++) {   // check if children are all leaves
-            if (node->children[i]) {
-                if (!node->children[i]->isLeaf()) {
-                    allChildrenAreLeaves = false;
-                    break;  // break if one child is not leaf (already checked-exceed max)
-                } else {
-                    totalPoints += node->children[i]->points.size();
-                }
-            }
-        }
-
-        if (allChildrenAreLeaves && totalPoints <= maxPointsPerNode * 1.5) {    // if all children combined have less than 1.5*max threshold, merge
-            vector<Point> mergedPoints;
-            Bounds mergedBounds;
-            for (int i = 0; i < 8; i++) {
-                if (node->children[i]) {
-                    mergedPoints.insert(mergedPoints.end(), node->children[i]->points.begin(), node->children[i]->points.end());
-                    for (Point& point : node->children[i]->points) {
-                        mergedBounds.update(point);
-                    }
-                    delete node->children[i];
-                    node->children[i] = nullptr;
-                }
-            }
-            node->points.swap(mergedPoints);  
-            node->bound = mergedBounds;
-            node->convertToLeaf();  
-        }
-        
-        else if (allChildrenAreLeaves) {    // if some children combined have less than max threshold, combine them
-            // sort children
-            vector<pair<int, int>> childPointCounts;
-            childPointCounts.reserve(8);    // Reserve memory to avoid reallocations
-            for (int i = 0; i < 8; i++) {
-                if (node->children[i]) {
-                    childPointCounts.emplace_back(node->children[i]->points.size(), i);;
-                }
-            }   
-            sort(childPointCounts.begin(), childPointCounts.end()); // Sort the vector by point count in ascending order
-
-            vector<Point> mergedPoints;
-            vector<OctreeNode*> newLeafNodes;
-            Bounds mergedBounds;
-
-            for (const auto& [pointCount, index] : childPointCounts) {
-                if (!mergedPoints.empty() && mergedPoints.size() + pointCount > maxPointsPerNode * 1.2) {    // Newly merged exceed the max limit
-                    OctreeNode* newLeaf = new OctreeNode(mergedBounds);
-                    newLeaf->points.swap(mergedPoints);  // Move the merged points to the new leaf node, use swap to save memory
-                    newLeaf->convertToLeaf();
-                    newLeafNodes.push_back(newLeaf);    // Add node
-                    mergedBounds = Bounds();
-                }
-
-                auto& childPoints = node->children[index]->points;
-                mergedPoints.insert(mergedPoints.end(),
-                            make_move_iterator(childPoints.begin()),
-                            make_move_iterator(childPoints.end()));     // Use move iterators to save memory
-                for (const Point& point : childPoints) {
-                    mergedBounds.update(point);
-                }
-                delete node->children[index]; 
-                node->children[index] = nullptr;
-            }
-
-            // Handle remaining merged points
-            if (!mergedPoints.empty()) {
-                OctreeNode* newLeaf = new OctreeNode(mergedBounds);
-                newLeaf->points.swap(mergedPoints);
-                newLeaf->convertToLeaf();
-                newLeafNodes.push_back(newLeaf);
-            }
-
-            // Reinsert any remaining children after the merged one
-            for (size_t i = 0; i < newLeafNodes.size(); i++) {
-                node->children[i] = newLeafNodes[i];
-            }
-
-            // Clear any remaining child pointers
-            for (size_t i = newLeafNodes.size(); i < 8; i++) {
-                node->children[i] = nullptr;
+    bool allChildrenAreLeaves = true;
+    int totalPoints = 0;
+    for (int i = 0; i < 8; i++) {   // check if children are all leaves
+        if (node->children[i]) {
+            if (!node->children[i]->isLeaf()) {
+                allChildrenAreLeaves = false;
+                break;  // break if one child is not leaf (already checked-exceed max)
+            } else {
+                totalPoints += node->children[i]->points.size();
             }
         }
     }
+
+    if (allChildrenAreLeaves && totalPoints <= maxPointsPerNode * 1.5) {    // if all children combined have less than 1.5*max threshold, merge
+        vector<Point> mergedPoints;
+        Bounds mergedBounds;
+        for (int i = 0; i < 8; i++) {
+            if (node->children[i]) {
+                mergedPoints.insert(mergedPoints.end(), node->children[i]->points.begin(), node->children[i]->points.end());
+                for (Point& point : node->children[i]->points) {
+                    mergedBounds.update(point);
+                }
+                delete node->children[i];
+                node->children[i] = nullptr;
+            }
+        }
+        node->points.swap(mergedPoints);  
+        node->bound = mergedBounds;
+        node->convertToLeaf();  
+    }
+    
+    else if (allChildrenAreLeaves) {    // if some children combined have less than max threshold, combine them
+        // sort children
+        vector<pair<int, int>> childPointCounts;
+        childPointCounts.reserve(8);    // Reserve memory to avoid reallocations
+        for (int i = 0; i < 8; i++) {
+            if (node->children[i]) {
+                childPointCounts.emplace_back(node->children[i]->points.size(), i);;
+            }
+        }   
+        sort(childPointCounts.begin(), childPointCounts.end()); // Sort the vector by point count in ascending order
+
+        vector<Point> mergedPoints;
+        vector<OctreeNode*> newLeafNodes;
+        Bounds mergedBounds;
+
+        for (const auto& [pointCount, index] : childPointCounts) {
+            if (!mergedPoints.empty() && mergedPoints.size() + pointCount > maxPointsPerNode * 1.2) {    // Newly merged exceed the max limit
+                OctreeNode* newLeaf = new OctreeNode(mergedBounds);
+                newLeaf->points.swap(mergedPoints);  // Move the merged points to the new leaf node, use swap to save memory
+                newLeaf->convertToLeaf();
+                newLeafNodes.push_back(newLeaf);    // Add node
+                mergedBounds = Bounds();
+            }
+
+            auto& childPoints = node->children[index]->points;
+            mergedPoints.insert(mergedPoints.end(),
+                        make_move_iterator(childPoints.begin()),
+                        make_move_iterator(childPoints.end()));     // Use move iterators to save memory
+            for (const Point& point : childPoints) {
+                mergedBounds.update(point);
+            }
+            delete node->children[index]; 
+            node->children[index] = nullptr;
+        }
+
+        // Handle remaining merged points
+        if (!mergedPoints.empty()) {
+            OctreeNode* newLeaf = new OctreeNode(mergedBounds);
+            newLeaf->points.swap(mergedPoints);
+            newLeaf->convertToLeaf();
+            newLeafNodes.push_back(newLeaf);
+        }
+
+        // Reinsert any remaining children after the merged one
+        for (size_t i = 0; i < newLeafNodes.size(); i++) {
+            node->children[i] = newLeafNodes[i];
+        }
+
+        // Clear any remaining child pointers
+        for (size_t i = newLeafNodes.size(); i < 8; i++) {
+            node->children[i] = nullptr;
+        }
+    }
+
+    /*
+    // Not improving efficiency
+    else {
+        vector<OctreeNode*> leafNodes;
+        vector<OctreeNode*> internalNodes;
+        for (int i = 0; i < 8; ++i) {
+            if (node->children[i]) {
+                if (node->children[i]->isLeaf()) {
+                    leafNodes.push_back(node->children[i]);
+                } else {
+                    internalNodes.push_back(node->children[i]);
+                }
+                node->children[i] = nullptr;  // Clear the child pointer
+            }
+        }
+        
+        // Sort leaf nodes by their point count in ascending order
+        sort(leafNodes.begin(), leafNodes.end(), [](const OctreeNode* a, const OctreeNode* b) {
+            return a->points.size() < b->points.size();
+        });
+
+        vector<OctreeNode*> nodesToReattach = internalNodes; 
+
+        while (!leafNodes.empty()) {
+            OctreeNode* mergeBase = leafNodes.front();
+            leafNodes.erase(leafNodes.begin());
+            bool merged = false;
+
+            for (auto it = leafNodes.begin(); it != leafNodes.end(); ) {
+                int potentialPointCount = mergeBase->points.size() + (*it)->points.size();
+                if (potentialPointCount <= maxPointsPerNode * 1.2) {
+                    mergeBase->points.insert(mergeBase->points.end(),
+                                            make_move_iterator((*it)->points.begin()),
+                                            make_move_iterator((*it)->points.end()));
+                    for (const Point& point : (*it)->points) {
+                        mergeBase->bound.update(point);
+                    }
+
+                    delete *it;  // Delete the absorbed node
+                    it = leafNodes.erase(it);  // Remove from leafNodes
+                    merged = true;
+                } else {
+                    it++;
+                }
+            }
+
+            if (merged) {
+                mergeBase->convertToLeaf();  // Ensure mergeBase is a leaf if any merging occurred
+                nodesToReattach.push_back(mergeBase);  // Add mergeBase to the list of nodes to reattach
+            } else {
+                nodesToReattach.push_back(mergeBase);  // Reattach mergeBase if no merging occurred
+            }
+        }
+
+        // Clear and rebuild node->children with reattached nodes
+        memset(node->children, 0, sizeof(node->children));      // Clear existing children pointers
+        for (int i = 0; i < nodesToReattach.size() && i < 8; i++) {
+            node->children[i] = nodesToReattach[i];  // Reattach nodes
+        }
+
+    }
+    */
 }
 
 
@@ -272,6 +333,7 @@ Bounds Octree::calculateChildBounds(Bounds& parentBounds, int octant) {
 // Function to create R-trees for each leaf node with thread limitation
 void Octree::initializeRTrees(OctreeNode* node, vector<future<void>>& futures) {
     if (node->isLeaf()) {
+
         // Check if reached the maximum number of concurrent tasks
         if (futures.size() >= max_concurrent_tasks) {
             // Wait for at least one task to complete
@@ -292,7 +354,10 @@ void Octree::initializeRTrees(OctreeNode* node, vector<future<void>>& futures) {
         }
 
         // Launch a new task for R-tree construction in the leaf node
-        futures.push_back(async(launch::async, [node]() {
+        futures.push_back(async(launch::async, [this, node]() {
+            // Regenerate bounds for the leaf node to ensure tight fitting
+            node->bound = calculateBoundsForPoints(node->points);
+
             node->rtree = new RTreePoints();
             RInsert(node->rtree, node->points);
             node->points.clear(); // Clear points after moving them to R-tree to save memory
@@ -306,3 +371,18 @@ void Octree::initializeRTrees(OctreeNode* node, vector<future<void>>& futures) {
     }
 }
 
+Bounds Octree::calculateBoundsForPoints(const vector<Point>& points) {
+    if (points.empty()) return Bounds();  // Return default bounds if no points
+
+    Point min = points[0], max = points[0];
+    for (const Point& point : points) {
+        min.x = std::min(min.x, point.x);
+        min.y = std::min(min.y, point.y);
+        min.z = std::min(min.z, point.z);
+
+        max.x = std::max(max.x, point.x);
+        max.y = std::max(max.y, point.y);
+        max.z = std::max(max.z, point.z);
+    }
+    return Bounds(min, max);
+}
