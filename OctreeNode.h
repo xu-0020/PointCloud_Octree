@@ -14,6 +14,8 @@ struct OctreeNode {
     OctreeNode* children[8] = {nullptr};        // Pointers to octants
     RTreePoints* rtree = nullptr;               // R-tree in this leaf node
 
+    OctreeNode() {}
+
     OctreeNode(const Bounds& b) : bound(b) {}
 
     ~OctreeNode() {
@@ -26,8 +28,14 @@ struct OctreeNode {
     }
 
     bool isLeaf() const {
-        return children[0] == nullptr;
+        for (const auto& child : children) {
+            if (child != nullptr) {
+                return false; 
+            }
+        }
+        return true; 
     }
+
 
     void convertToLeaf() {
         for (int i = 0; i < 8; i++) {

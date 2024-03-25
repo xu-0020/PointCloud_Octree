@@ -172,7 +172,7 @@ int main() {
         }
     }
 
-
+    /*
     
     // Normal Processing
     
@@ -191,7 +191,7 @@ int main() {
 
     octree.visualize("Octree Structure 2");
 
-    /*
+    
 
     octree.buildRtrees();
 
@@ -209,7 +209,7 @@ int main() {
     }
 
     
-
+    */
 
     
 
@@ -217,14 +217,14 @@ int main() {
 
     // Variable settings arrays
     vector<int> multimMaxDepths = {7};
-    vector<int> multiMaxPointsPerNodes = {8000};
+    vector<int> multiMaxPointsPerNodes = {4000, 6000, 8000};
 
     // Open CSV file for output in append mode
     ofstream csvFile("octree_timing_results.csv", ios_base::app); 
     csvFile << "MaxDepth,MaxPointsPerNode,ConstructionTime(ms),RangeQueryTime(ms)\n";
 
     int fixed = 0;
-    for (int n=0; n<5; n++) {
+    for (int n=0; n<1; n++) {
         for (int i=0; i<multiMaxPointsPerNodes.size(); i++) {
 
             Octree octree(bounds, multimMaxDepths[fixed], multiMaxPointsPerNodes[i]);
@@ -232,7 +232,7 @@ int main() {
             // Measure construction time
             auto start1 = chrono::high_resolution_clock::now();
             buildOctreeFromCSV(filenames, octree);
-            octree.trim(multimMaxDepths[fixed] * (2/3));
+            octree.trim(multimMaxDepths[fixed]/2);
             octree.buildRtrees();
             auto stop1 = chrono::high_resolution_clock::now();
 
@@ -258,7 +258,7 @@ int main() {
     }
     csvFile.close();
 
-    */
+    
 
     return 0;
 }

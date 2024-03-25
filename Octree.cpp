@@ -134,21 +134,16 @@ void Octree::mergeUnderpopulatedNodes(OctreeNode* node, int depth, int startDept
         }
     }
 
-    if (allChildrenAreLeaves && totalPoints <= maxPointsPerNode * 1.5) {    // if all children combined have less than 1.5*max threshold, merge
+    if (allChildrenAreLeaves && totalPoints <= maxPointsPerNode * 1.2) {    // if all children combined have less than 1.5*max threshold, merge
         vector<Point> mergedPoints;
-        Bounds mergedBounds;
         for (int i = 0; i < 8; i++) {
             if (node->children[i]) {
                 mergedPoints.insert(mergedPoints.end(), node->children[i]->points.begin(), node->children[i]->points.end());
-                for (Point& point : node->children[i]->points) {
-                    mergedBounds.update(point);
-                }
                 delete node->children[i];
                 node->children[i] = nullptr;
             }
         }
         node->points.swap(mergedPoints);  
-        node->bound = mergedBounds;
         node->convertToLeaf();  
     }
     
@@ -165,31 +160,26 @@ void Octree::mergeUnderpopulatedNodes(OctreeNode* node, int depth, int startDept
 
         vector<Point> mergedPoints;
         vector<OctreeNode*> newLeafNodes;
-        Bounds mergedBounds;
 
         for (const auto& [pointCount, index] : childPointCounts) {
-            if (!mergedPoints.empty() && mergedPoints.size() + pointCount > maxPointsPerNode * 1.2) {    // Newly merged exceed the max limit
-                OctreeNode* newLeaf = new OctreeNode(mergedBounds);
+            if (!mergedPoints.empty() && mergedPoints.size() + pointCount > maxPointsPerNode) {    // Newly merged exceed the max limit
+                OctreeNode* newLeaf = new OctreeNode();
                 newLeaf->points.swap(mergedPoints);  // Move the merged points to the new leaf node, use swap to save memory
                 newLeaf->convertToLeaf();
                 newLeafNodes.push_back(newLeaf);    // Add node
-                mergedBounds = Bounds();
             }
 
             auto& childPoints = node->children[index]->points;
             mergedPoints.insert(mergedPoints.end(),
                         make_move_iterator(childPoints.begin()),
                         make_move_iterator(childPoints.end()));     // Use move iterators to save memory
-            for (const Point& point : childPoints) {
-                mergedBounds.update(point);
-            }
             delete node->children[index]; 
             node->children[index] = nullptr;
         }
 
         // Handle remaining merged points
         if (!mergedPoints.empty()) {
-            OctreeNode* newLeaf = new OctreeNode(mergedBounds);
+            OctreeNode* newLeaf = new OctreeNode();
             newLeaf->points.swap(mergedPoints);
             newLeaf->convertToLeaf();
             newLeafNodes.push_back(newLeaf);
@@ -236,13 +226,10 @@ void Octree::mergeUnderpopulatedNodes(OctreeNode* node, int depth, int startDept
 
             for (auto it = leafNodes.begin(); it != leafNodes.end(); ) {
                 int potentialPointCount = mergeBase->points.size() + (*it)->points.size();
-                if (potentialPointCount <= maxPointsPerNode * 1.2) {
+                if (potentialPointCount <= maxPointsPerNode) {
                     mergeBase->points.insert(mergeBase->points.end(),
                                             make_move_iterator((*it)->points.begin()),
                                             make_move_iterator((*it)->points.end()));
-                    for (const Point& point : (*it)->points) {
-                        mergeBase->bound.update(point);
-                    }
 
                     delete *it;  // Delete the absorbed node
                     it = leafNodes.erase(it);  // Remove from leafNodes
