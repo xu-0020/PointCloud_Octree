@@ -5,12 +5,15 @@
 #include <thread>
 
 #include "Octree.h"
+#include "RadixSort.h"
 using namespace std;
 
 #include <filesystem>
 namespace fs = filesystem;
 
-const size_t max_concurrent_tasks = 30;     // concurrency control for building octree
+const size_t max_concurrent_tasks = 30;     // concurrency control
+
+
 
 Bounds computeBoundingBoxFromSingleCSV(const string& filename) {
     Bounds bounds;
@@ -49,8 +52,10 @@ Bounds computeBoundingBoxFromSingleCSV(const string& filename) {
 }
 
 
+
+
 // Single file processing
-void processFileAndInsertPoints(const string& filename, Octree& octree, mutex& octreeMutex) {
+void processFileAndInsertPoints(const string& filename, vector<Point>& dataPoints, mutex& dataMutex) {
     ifstream file(filename);
     string line;
 
@@ -74,14 +79,14 @@ void processFileAndInsertPoints(const string& filename, Octree& octree, mutex& o
         string source = values[6];
         Point point(x, y, z, r, g, b, source);
 
-        // Synchronize access to the octree
-        lock_guard<mutex> guard(octreeMutex);
-        octree.insert(point);
+        // Synchronize access
+        lock_guard<mutex> guard(dataMutex);
+        dataPoints.push_back(point);
     }
 }
 
-void buildOctreeFromCSV(const vector<string>& filenames, Octree& octree) {
-    mutex octreeMutex;
+void readFromCSV(const vector<string>& filenames, vector<Point>& dataPoints) {
+    mutex dataMutex;
     vector<future<void>> futures;
 
     for (const auto& filename : filenames) {
@@ -104,14 +109,13 @@ void buildOctreeFromCSV(const vector<string>& filenames, Octree& octree) {
             }
         }
 
-        futures.push_back(async(launch::async, processFileAndInsertPoints, filename, ref(octree), ref(octreeMutex)));
+        futures.push_back(async(launch::async, processFileAndInsertPoints, filename, ref(dataPoints), ref(dataMutex)));
     }
 
     for (auto& fut : futures) {
         fut.get();      // waits for the tasks to finish
     }
 }
-
 
 
 int main() {
@@ -151,7 +155,7 @@ int main() {
         return 1; 
     }
 
-
+    // Acquiring the bounding box of entire datasets.
     vector<future<Bounds>> futureBounds;
     // Launch a task for each file
     for (const auto& filename : filenames) {
@@ -171,92 +175,30 @@ int main() {
             bounds.update(b.max);
         }
     }
+    // Boundingbox acquired.
 
-    /*
-    
-    // Normal Processing
-    
-    // Variable settings
-    int maxDepth = 7;
-    int maxPointsPerNode = 8000;
-    Octree octree(bounds, maxDepth, maxPointsPerNode);
+    // Read from CSV data
+    vector<Point> dataPoints;
+    readFromCSV(filenames, dataPoints);
 
-    buildOctreeFromCSV(filenames, octree);
-
-    octree.visualize("Octree Structure 1");
-
-
-    // Trim octree
-    octree.trim(maxDepth * (2/3));
-
-    octree.visualize("Octree Structure 2");
-
-    
-
-    octree.buildRtrees();
-
-    // Range query
-    Bounds queryRange;
-    queryRange.min = Point(bounds.getCenter().x - 15, bounds.getCenter().y - 15, bounds.getCenter().z - 15); 
-    queryRange.max = Point(bounds.getCenter().x + 15, bounds.getCenter().y + 15, bounds.getCenter().z + 15);  
-    vector<Point> queryResults;
-
-    octree.executeRangeQuery(queryRange, queryResults);
-
-    cout << "Query Result: " << endl;
-    for (const Point& point : queryResults) {
-        cout << "Point: " << point.x << " " << point.y << " " << point.z << endl;
+    // Morton encoding
+    vector<pair<int, uint64_t>> mortonCode;    // corresponding to each dataPoints, (index, mortoncode)
+    for (int i=0; i<dataPoints.size(); i++) {
+        Point& point = dataPoints[i];
+        uint64_t code = point.mortonCode(point.x, point.y, point.z, bounds.min.x, bounds.min.y, bounds.min.z, bounds.max.x, bounds.max.y, bounds.max.z);
+        mortonCode.push_back(make_pair(i, code));
     }
-
     
-    */
+    // Sort based on Morton code
+    radixSort(mortonCode);
 
-    
-
-    // Code for testing the time for query and construrction
-
-    // Variable settings arrays
-    vector<int> multimMaxDepths = {7};
-    vector<int> multiMaxPointsPerNodes = {4000, 6000, 8000};
-
-    // Open CSV file for output in append mode
-    ofstream csvFile("octree_timing_results.csv", ios_base::app); 
-    csvFile << "MaxDepth,MaxPointsPerNode,ConstructionTime(ms),RangeQueryTime(ms)\n";
-
-    int fixed = 0;
-    for (int n=0; n<1; n++) {
-        for (int i=0; i<multiMaxPointsPerNodes.size(); i++) {
-
-            Octree octree(bounds, multimMaxDepths[fixed], multiMaxPointsPerNodes[i]);
-
-            // Measure construction time
-            auto start1 = chrono::high_resolution_clock::now();
-            buildOctreeFromCSV(filenames, octree);
-            octree.trim(multimMaxDepths[fixed]/2);
-            octree.buildRtrees();
-            auto stop1 = chrono::high_resolution_clock::now();
-
-            // Measure range query time
-            Bounds queryRange;
-            vector<Point> queryResults;
-            int searchSize = 50;
-            queryRange.min = Point(bounds.getCenter().x - searchSize, bounds.getCenter().y - searchSize, bounds.getCenter().z - searchSize); 
-            queryRange.max = Point(bounds.getCenter().x + searchSize, bounds.getCenter().y + searchSize, bounds.getCenter().z + searchSize);  
-
-
-            auto start2 = chrono::high_resolution_clock::now();
-            octree.executeRangeQuery(queryRange, queryResults);
-            auto stop2 = chrono::high_resolution_clock::now();
-
-            // Calculate durations
-            auto constructionDuration = chrono::duration_cast<chrono::milliseconds>(stop1 - start1);
-            auto queryDuration = chrono::duration_cast<chrono::milliseconds>(stop2 - start2);
-
-            // Write to CSV
-            csvFile << multimMaxDepths[fixed] << "," << multiMaxPointsPerNodes[i] << "," << constructionDuration.count() << "," << queryDuration.count() << "\n";
-        }
+    for (int i = 0; i < 100; i++) {
+        cout << "Morton Code: " << mortonCode[i].second << "Point: " 
+                        << dataPoints[mortonCode[i].first].x << ","
+                        << dataPoints[mortonCode[i].first].y << ","
+                        << dataPoints[mortonCode[i].first].z
+                        << endl;
     }
-    csvFile.close();
 
     
 

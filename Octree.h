@@ -9,13 +9,6 @@ private:
     int maxDepth;
     int maxPointsPerNode;
 
-    // Function to determine the child index for a point
-    int getOctant(const Point& origin, Point& point);
-
-    // Recursive function to insert a point into the tree
-    void insert(OctreeNode* node, Point& point, int depth);
-    
-    void subdivideAndInsert(OctreeNode* node, Point& point, int depth);
 
     // Function to merge underpopulated leaf nodes
     void mergeUnderpopulatedNodes(OctreeNode* node, int depth, const int startDepth);
@@ -44,9 +37,9 @@ public:
         delete root;
     };
 
-    void insert(Point& point) {
-        insert(root, point, 0);
-    };
+
+
+
 
     // Function to optimize octree 
     void trim(int startDepth) {
