@@ -38,6 +38,7 @@ struct Point {
         
     }
 
+    // Morton Enconding functions
     uint64_t mortonCode(float x, float y, float z, float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
         uint32_t normX = normalizeCoordinate(x, minX, maxX);
         uint32_t normY = normalizeCoordinate(y, minY, maxY);
@@ -50,7 +51,7 @@ private:
     // Normalize the coordinate to [0, 2^32)
     uint32_t normalizeCoordinate(float coord, float minCoord, float maxCoord) {
         const uint32_t maxRange = 0xFFFFFFFF; // 2^32 - 1
-        return static_cast<uint32_t>((coord - minCoord) / (maxCoord - minCoord) * maxRange);
+        return static_cast<uint32_t>((coord - minCoord) / (maxCoord - minCoord) * maxRange);    // Min-max normalization
     }
 
     uint64_t interleaveBits(uint32_t x, uint32_t y, uint32_t z) {

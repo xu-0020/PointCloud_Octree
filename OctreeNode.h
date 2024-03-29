@@ -10,7 +10,7 @@ typedef Point ValueType;
 
 struct OctreeNode {
     Bounds bound;                               // Bounding box of the node
-    vector<Point> points;                       // Points contained in this node
+    vector<int> points;                         // indexs of Points contained in this node
     OctreeNode* children[8] = {nullptr};        // Pointers to octants
     RTreePoints* rtree = nullptr;               // R-tree in this leaf node
 

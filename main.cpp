@@ -11,7 +11,7 @@ using namespace std;
 #include <filesystem>
 namespace fs = filesystem;
 
-const size_t max_concurrent_tasks = 30;     // concurrency control
+const size_t max_concurrent_tasks = 8;     // concurrency control
 
 
 
@@ -118,6 +118,8 @@ void readFromCSV(const vector<string>& filenames, vector<Point>& dataPoints) {
 }
 
 
+
+
 int main() {
     string choice;
     cout << "Please select input file by folder name(0) or path(1):" << endl;
@@ -177,6 +179,8 @@ int main() {
     }
     // Boundingbox acquired.
 
+
+
     // Read from CSV data
     vector<Point> dataPoints;
     readFromCSV(filenames, dataPoints);
@@ -191,16 +195,19 @@ int main() {
     
     // Sort based on Morton code
     radixSort(mortonCode);
-
-    for (int i = 0; i < 100; i++) {
-        cout << "Morton Code: " << mortonCode[i].second << "Point: " 
-                        << dataPoints[mortonCode[i].first].x << ","
-                        << dataPoints[mortonCode[i].first].y << ","
-                        << dataPoints[mortonCode[i].first].z
-                        << endl;
-    }
-
     
+
+    // Tree Variable Settings
+    int maxDepth = 10;
+    int maxPointsPerLeaf = 6000;
+
+    Octree octree(bounds, maxDepth, maxPointsPerLeaf);
+
+    octree.constructOctree(dataPoints, mortonCode);
+    octree.rebalance(dataPoints);
+    octree.trim(dataPoints);
+
+
 
     return 0;
 }
