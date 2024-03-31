@@ -9,8 +9,11 @@ private:
     int maxDepth;
     int maxPointsPerNode;
 
-    // Function to initialize the leaf nodes
-    vector<OctreeNode*> createLeafNodes(const vector<Point>& dataPoints, const vector<pair<int, uint64_t>>& mortonCode);
+    // Function to create the leaf nodes multithreaded
+    vector<OctreeNode*> createLeafNodesMultithreaded(const vector<Point>& dataPoints, const vector<pair<int, uint64_t>>& mortonCode);
+
+    // Helper Function to create the leaf nodes for the thread
+    vector<OctreeNode*> createLeafNodesSegment(const vector<Point>& dataPoints, const vector<pair<int, uint64_t>>& mortonCode, size_t start, size_t end, uint64_t gridSize);
 
     // Function to build the tree from leaf nodes
     void buildFromLeafNodes(vector<OctreeNode*>& leafNodes, int depth);
@@ -18,20 +21,20 @@ private:
     // Function to merge underpopulated leaf nodes
     void mergeUnderpopulatedNodes(OctreeNode* node, int depth, const vector<Point>& dataPoints);
 
-    // Function to divide overpopulated leaf nodes
-    void divideOverpopulatedNodes(OctreeNode* node, int depth, const vector<Point>& dataPoints);
+    // Function to divide overpopulated leaf nodes multithreaded
+    void divideOverpopulatedNodes(OctreeNode* node, vector<future<void>>& futures, int depth, const vector<Point>& dataPoints);
 
     // Function to visualize built node in the Octree
     void visualizeNode(OctreeNode* node, int level, ofstream& outFile);
 
-    // Function to recalculate bounds for a set of points (Regenerate for optimization)
+    // Helper Function to calculate bounds
     Bounds calculateBoundsForPoints(const vector<Point>& dataPoints, const vector<int>& pointsIndices);
 
     // Range Query function
-    void rangeQuery(Bounds& queryRange, vector<Point>& results, OctreeNode* node, int depth = 0);
+    void rangeQuery(Bounds& queryRange, vector<Point>& results, OctreeNode* node);
 
     // Function to create R-trees for each leaf node
-    void initializeRTrees(OctreeNode* node, vector<future<void>>& futures);
+    void initializeRTrees(OctreeNode* node, vector<future<void>>& futures, const vector<Point>& dataPoints);
 
     Bounds calculateChildBounds(Bounds& parentBounds, int octant);
 
@@ -54,7 +57,7 @@ public:
 
     void constructOctree(const vector<Point>& dataPoints, const vector<pair<int, uint64_t>>& mortonCode) {
         // Initialize bottom level leaf nodes and count for each grid
-        vector<OctreeNode*> leafNodes = createLeafNodes(dataPoints, mortonCode);
+        vector<OctreeNode*> leafNodes = createLeafNodesMultithreaded(dataPoints, mortonCode);
 
         // Recursively build the tree from leaf nodes
         buildFromLeafNodes(leafNodes, maxDepth);
@@ -62,7 +65,13 @@ public:
 
     // Function to rebalance the octree (divide the cluster at the bottom)
     void rebalance(const vector<Point>& dataPoints) {
-        divideOverpopulatedNodes(root, 0, dataPoints);
+        vector<future<void>> futures;
+        divideOverpopulatedNodes(root, futures, 0, dataPoints);
+
+        // Wait for all threads to complete
+        for (auto& fut : futures) {
+            fut.get();
+        }
     };
 
     // Function to optimize octree 
@@ -87,9 +96,9 @@ public:
     };
     
     // Search leaf nodes and build R-trees
-    void buildRtrees() {
+    void buildRtrees(const vector<Point>& dataPoints) {
         vector<future<void>> futures;
-        initializeRTrees(root, futures);
+        initializeRTrees(root, futures, dataPoints);
 
         // Wait for all threads to complete
         for (auto& fut : futures) {

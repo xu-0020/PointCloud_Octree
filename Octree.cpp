@@ -4,7 +4,7 @@
 #include "Octree.h"
 #include <string.h>
 
-const size_t max_concurrent_tasks = 8;     // concurrency control for building r-trees
+const size_t max_concurrent_tasks = 30;     // concurrency control for building r-trees
 
 
 // R-tree functions
@@ -59,24 +59,48 @@ void RSearch(RTreePoints* tree, std::vector<Point>& results, Bounds& queryRange)
 // End of R-tree functions
 
 
-vector<OctreeNode*> Octree::createLeafNodes(const vector<Point>& dataPoints, const vector<pair<int, uint64_t>>& mortonCode) {
-    vector<OctreeNode*> leafNodes;
+
+vector<OctreeNode*> Octree::createLeafNodesMultithreaded(const vector<Point>& dataPoints, const vector<pair<int, uint64_t>>& mortonCode) {
+    const size_t numThreads = 32;
+    const size_t segmentSize = ceil(mortonCode.size() / static_cast<double>(numThreads));
+
     uint64_t numberOfGrid = pow(8, maxDepth);    // Number of grids at the maximum depth
     uint64_t gridSize = (pow(2, 32) - 1) / numberOfGrid;     // Grid size for the current depth
 
+    vector<future<vector<OctreeNode*>>> futures;
 
-    int start = 0, end = 0;
-    while (start < mortonCode.size()) {
+    for (size_t i = 0; i < numThreads && i * segmentSize < mortonCode.size(); ++i) {
+        size_t start = i * segmentSize;
+        size_t end = min(start + segmentSize, mortonCode.size());
+
+        futures.push_back(async(launch::async, [&, start, end] {
+            return createLeafNodesSegment(dataPoints, mortonCode, start, end, gridSize);
+        }));
+    }
+
+    vector<OctreeNode*> leafNodes;
+    for (auto& fut : futures) {
+        auto segmentLeafNodes = fut.get();
+        leafNodes.insert(leafNodes.end(), segmentLeafNodes.begin(), segmentLeafNodes.end());
+    }
+
+    return leafNodes;
+}
+
+
+vector<OctreeNode*> Octree::createLeafNodesSegment(const vector<Point>& dataPoints, const vector<pair<int, uint64_t>>& mortonCode, size_t start, size_t end, uint64_t gridSize) {
+    vector<OctreeNode*> segmentLeafNodes;
+
+    while (start < end) {
         // Morton code at the start pointer represents the beginning of the current grid
         uint64_t startGridCode = mortonCode[start].second - (mortonCode[start].second % gridSize);
 
         // Collect indices of points in the current grid
         vector<int> pointIndices;
 
-        // Move the end pointer forward until it reaches a point outside the current grid
-        while (end < mortonCode.size() && (mortonCode[end].second - (mortonCode[end].second % gridSize)) == startGridCode) {
-            pointIndices.push_back(mortonCode[end].first);
-            end++;
+        while (start < end && (mortonCode[start].second - (mortonCode[start].second % gridSize)) == startGridCode) {
+            pointIndices.push_back(mortonCode[start].first);
+            start++;  
         }
 
         // Create a leaf node for the current grid if it contains points
@@ -86,14 +110,12 @@ vector<OctreeNode*> Octree::createLeafNodes(const vector<Point>& dataPoints, con
             // Create a new leaf node
             OctreeNode* leafNode = new OctreeNode(bounds);
             leafNode->points.swap(pointIndices); 
-            leafNodes.push_back(leafNode);
+            segmentLeafNodes.push_back(leafNode);
         }
 
-        // Restart the process
-        start = end;
     }
 
-    return leafNodes;
+    return segmentLeafNodes;
 }
 
 
@@ -124,11 +146,6 @@ void Octree::buildFromLeafNodes(vector<OctreeNode*>& nodes, int currentDepth) {
             int childIndex = i * 8 + j;
             OctreeNode* childNode = nodes[childIndex];
 
-            if (!childNode->isLeaf()) {
-                isInternal = true;  // Stop merging
-                break;
-            }
-
             // Update parent bounds to include child bounds
             if (firstNode) {
                 parentBounds = childNode->bound;
@@ -138,14 +155,19 @@ void Octree::buildFromLeafNodes(vector<OctreeNode*>& nodes, int currentDepth) {
                 parentBounds.update(childNode->bound.max);
             }
 
-            // Merge child points into parent
-            parentPointIndices.insert(parentPointIndices.end(), childNode->points.begin(), childNode->points.end());
+            // Check if any child is an internal node
+            if (!childNode->isLeaf()) {
+                isInternal = true;
+            } else {
+                // Merge child points into parent
+                parentPointIndices.insert(parentPointIndices.end(), childNode->points.begin(), childNode->points.end());
+            }
         }
 
         // Create a new parent node
         OctreeNode* parentNode = new OctreeNode(parentBounds);
 
-        // Internal: Assign children to the parent node
+        // Internal: Assign children to the parent node if any child is internal or total size exceeds the limit
         if (isInternal || parentPointIndices.size() > maxPointsPerNode) {
             for (int j = 0; j < 8 && i * 8 + j < nodes.size(); j++) {
                 parentNode->children[j] = nodes[i * 8 + j];
@@ -192,23 +214,48 @@ void Octree::visualizeNode(OctreeNode* node, int level, ofstream& outFile) {
     }
 }
 
-void Octree::divideOverpopulatedNodes(OctreeNode* node, int depth, const vector<Point>& dataPoints) {
-    if (!node) return;
-    if (node->isLeaf()) {
-        if (node->points.size() > maxPointsPerNode * 1.2) {
-            // Handle Overpopulated leaf nodes at bottom level (further divide)
-            for (int indices : node->points) {
-                subdivideAndInsert(node, indices, depth, dataPoints);     // Reinsert existing points in the current node
-            }
-            node->points.clear();   // Remove points as they are moved to lower level
-        }
-        return;
-    }
 
-    for (int i = 0; i < 8; i++) {
-        divideOverpopulatedNodes(node->children[i], depth + 1, dataPoints);
+void Octree::divideOverpopulatedNodes(OctreeNode* node, vector<future<void>>& futures, int depth, const vector<Point>& dataPoints) {
+    if (!node) return;
+
+    if (node->isLeaf()) {
+        // Check if reached the maximum number of concurrent tasks
+        if (futures.size() >= max_concurrent_tasks) {
+            // Wait for at least one task to complete
+            bool taskCompleted = false;
+            while (!taskCompleted) {
+                for (auto it = futures.begin(); it != futures.end(); ) {
+                    auto& fut = *it;
+                    if (fut.wait_for(chrono::seconds(0)) == future_status::ready) {
+                        fut.get();              // Get the result to clear any stored exception
+                        it = futures.erase(it);     // Remove the completed future
+                        taskCompleted = true;
+                        break;           // Break the loop as we only need one task to complete
+                    } else {
+                        it++;
+                    }
+                }
+            }
+        }
+
+        futures.push_back(async(launch::async, [this, node, depth, &dataPoints]() {
+            if (node->isLeaf() && node->points.size() > maxPointsPerNode * 1.2) {
+            // Handle Overpopulated leaf nodes at bottom level (further divide)
+                for (int index : node->points) {
+                    subdivideAndInsert(node, index, depth, dataPoints);  // Reinsert existing points in the current node
+                }
+                node->points.clear();  // Remove points as they are moved to a lower level
+            }}));
+    } 
+    else {
+        for (int i = 0; i < 8; i++) {
+            if (node->children[i]) {
+                divideOverpopulatedNodes(node->children[i], futures, depth + 1, dataPoints);
+            }
+        }
     }
 }
+
 
 
 
@@ -233,7 +280,7 @@ void Octree::mergeUnderpopulatedNodes(OctreeNode* node, int depth, const vector<
         }
     }
 
-    if (allChildrenAreLeaves && totalPoints <= maxPointsPerNode * 1.2) {    // if all children combined have less than 1.5*max threshold, merge
+    if (allChildrenAreLeaves && totalPoints <= maxPointsPerNode * 1.5) {    // if all children combined have less than 1.5*max threshold, merge
         vector<int> mergedPointIndices;
         for (int i = 0; i < 8; i++) {
             if (node->children[i]) {
@@ -245,7 +292,8 @@ void Octree::mergeUnderpopulatedNodes(OctreeNode* node, int depth, const vector<
         node->points.swap(mergedPointIndices);  
         node->convertToLeaf();  
     }
-    
+    /*
+    // Not Improving the performance
     else if (allChildrenAreLeaves) {    // if some children combined have less than max threshold, combine them
         // sort children
         vector<pair<int, int>> childPointCounts;
@@ -292,8 +340,61 @@ void Octree::mergeUnderpopulatedNodes(OctreeNode* node, int depth, const vector<
             node->children[i] = nullptr;
         }
     }
+    
+    else {
+        vector<OctreeNode*> leafNodes;
+        vector<OctreeNode*> internalNodes;
+        for (int i = 0; i < 8; ++i) {
+            if (node->children[i]) {
+                if (node->children[i]->isLeaf()) {
+                    leafNodes.push_back(node->children[i]);
+                } else {
+                    internalNodes.push_back(node->children[i]);
+                }
+                node->children[i] = nullptr;  // Clear the child pointer
+            }
+        }
+        
+        // Sort leaf nodes by their point count in ascending order
+        sort(leafNodes.begin(), leafNodes.end(), [](const OctreeNode* a, const OctreeNode* b) {
+            return a->points.size() < b->points.size();
+        });
 
+        vector<OctreeNode*> nodesToReattach = internalNodes; 
 
+        while (!leafNodes.empty()) {
+            OctreeNode* mergeBase = leafNodes.front();
+            leafNodes.erase(leafNodes.begin());
+            bool merged = false;
+
+            for (auto it = leafNodes.begin(); it != leafNodes.end(); ) {
+                int potentialPointCount = mergeBase->points.size() + (*it)->points.size();
+                if (potentialPointCount <= maxPointsPerNode) {
+                    mergeBase->points.insert(mergeBase->points.end(), (*it)->points.begin(), (*it)->points.end());
+                    delete *it;  // Delete the absorbed node
+                    it = leafNodes.erase(it);  // Remove from leafNodes
+                    merged = true;
+                } else {
+                    it++;
+                }
+            }
+
+            if (merged) {
+                mergeBase->convertToLeaf();  // Ensure mergeBase is a leaf if any merging occurred
+                nodesToReattach.push_back(mergeBase);  // Add mergeBase to the list of nodes to reattach
+            } else {
+                nodesToReattach.push_back(mergeBase);  // Reattach mergeBase if no merging occurred
+            }
+        }
+
+        // Clear and rebuild node->children with reattached nodes
+        memset(node->children, 0, sizeof(node->children));      // Clear existing children pointers
+        for (int i = 0; i < nodesToReattach.size() && i < 8; i++) {
+            node->children[i] = nodesToReattach[i];  // Reattach nodes
+        }
+
+    }
+    */
 }
 
 void Octree::subdivideAndInsert(OctreeNode* node, int pointIdx, int depth, const vector<Point>& dataPoints) {
@@ -307,7 +408,7 @@ void Octree::subdivideAndInsert(OctreeNode* node, int pointIdx, int depth, const
 }
 
 void Octree::insert(OctreeNode* node, int pointIdx, int depth, const vector<Point>& dataPoints) {
-    if (node->points.size() < maxPointsPerNode || depth >= maxDepth * 1.5) {
+    if (node->points.size() < maxPointsPerNode * 1.5 || depth >= maxDepth * 1.5) {
         node->points.push_back(pointIdx);
         return;
     }
@@ -322,25 +423,19 @@ void Octree::insert(OctreeNode* node, int pointIdx, int depth, const vector<Poin
 
 
 
-/*
-void Octree::rangeQuery(Bounds& queryRange, vector<Point>& results, OctreeNode* node, int depth) {
-    // Check if the current node's bounds intersect with the query range
-    if (!node->bound.intersects(queryRange)) {
-        return;
-    }
+
+void Octree::rangeQuery(Bounds& queryRange, vector<Point>& results, OctreeNode* node) {
 
     if (node->isLeaf()) {
         // If it's a leaf node, query the R-tree
-        if (node->rtree) {
-            vector<Point> rtreeResults;
-            RSearch(node->rtree, rtreeResults, queryRange);
-            results.insert(results.end(), rtreeResults.begin(), rtreeResults.end());    // Use move iterators to save memory
-        } 
+        RSearch(node->rtree, results, queryRange);
     } 
     else {
         for (int i = 0; i < 8; i++) {
             if (node->children[i]) {
-                rangeQuery(queryRange, results, node->children[i], depth + 1);
+                if (node->children[i]->bound.intersects(queryRange)) {  // Check if the node's bounds intersect with the query range
+                    rangeQuery(queryRange, results, node->children[i]);
+                }
             }
         }
     }
@@ -349,7 +444,7 @@ void Octree::rangeQuery(Bounds& queryRange, vector<Point>& results, OctreeNode* 
 
 
 // Function to create R-trees for each leaf node with thread limitation
-void Octree::initializeRTrees(OctreeNode* node, vector<future<void>>& futures) {
+void Octree::initializeRTrees(OctreeNode* node, vector<future<void>>& futures, const vector<Point>& dataPoints) {
     if (node->isLeaf()) {
 
         // Check if reached the maximum number of concurrent tasks
@@ -359,7 +454,7 @@ void Octree::initializeRTrees(OctreeNode* node, vector<future<void>>& futures) {
             while (!taskCompleted) {
                 for (auto it = futures.begin(); it != futures.end(); ) {
                     auto& fut = *it;
-                    if (fut.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+                    if (fut.wait_for(chrono::seconds(0)) == future_status::ready) {
                         fut.get();              // Get the result to clear any stored exception
                         it = futures.erase(it);     // Remove the completed future
                         taskCompleted = true;
@@ -372,24 +467,28 @@ void Octree::initializeRTrees(OctreeNode* node, vector<future<void>>& futures) {
         }
 
         // Launch a new task for R-tree construction in the leaf node
-        futures.push_back(async(launch::async, [this, node]() {
+        futures.push_back(async(launch::async, [this, node, &dataPoints]() {
             // Regenerate bounds for the leaf node to ensure tight fitting
-            node->bound = calculateBoundsForPoints(node->points);
+            node->bound = calculateBoundsForPoints(dataPoints, node->points);
 
             node->rtree = new RTreePoints();
-            RInsert(node->rtree, node->points);
-            node->points.clear(); // Clear points after moving them to R-tree to save memory
+            vector<Point> insertPoints;         // Retrieve points to be inserted in to the Rtree.
+            for (int i=0; i<node->points.size(); i++) {
+                insertPoints.push_back(dataPoints[node->points[i]]);
+            }
+            node->points.clear();
+            RInsert(node->rtree, insertPoints);
         }));
     } else {
         for (int i = 0; i < 8; i++) {
             if (node->children[i]) {
-                initializeRTrees(node->children[i], futures);
+                initializeRTrees(node->children[i], futures, dataPoints);
             }
         }
     }
 }
 
-*/
+
 
 Bounds Octree::calculateBoundsForPoints(const vector<Point>& dataPoints, const vector<int>& pointsIndices) {
     if (pointsIndices.empty()) return Bounds();  // Return default bounds if no points

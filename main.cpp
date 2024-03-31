@@ -11,7 +11,7 @@ using namespace std;
 #include <filesystem>
 namespace fs = filesystem;
 
-const size_t max_concurrent_tasks = 8;     // concurrency control
+const size_t max_concurrent_tasks = 30;     // concurrency control
 
 
 
@@ -117,6 +117,40 @@ void readFromCSV(const vector<string>& filenames, vector<Point>& dataPoints) {
     }
 }
 
+// Morton encoding Functions
+vector<pair<int, uint64_t>> computeMortonCodesSegment(const vector<Point>& dataPoints, const Bounds& bounds, size_t start, size_t end) {
+    vector<pair<int, uint64_t>> segmentMortonCodes;
+    for (size_t i = start; i < end; i++) {
+        const Point& point = dataPoints[i];
+        uint64_t code = point.mortonCode(point.x, point.y, point.z, bounds.min.x, bounds.min.y, bounds.min.z, bounds.max.x, bounds.max.y, bounds.max.z);
+        segmentMortonCodes.push_back(make_pair(i, code));
+    }
+    return segmentMortonCodes;
+}
+
+vector<pair<int, uint64_t>> computeMortonCodesMultithreaded(const vector<Point>& dataPoints, const Bounds& bounds) {
+    const size_t segmentSize = ceil(dataPoints.size() / static_cast<double>(max_concurrent_tasks));
+
+    vector<future<vector<pair<int, uint64_t>>>> futures;
+
+    for (size_t i = 0; i < max_concurrent_tasks && i * segmentSize < dataPoints.size(); i++) {
+        size_t start = i * segmentSize;
+        size_t end = min(start + segmentSize, dataPoints.size());
+
+        futures.push_back(async(launch::async, [&dataPoints, &bounds, start, end] {
+            return computeMortonCodesSegment(dataPoints, bounds, start, end);
+        }));
+    }
+
+    vector<pair<int, uint64_t>> mortonCode;
+    for (auto& fut : futures) {
+        auto segmentMortonCodes = fut.get();
+        mortonCode.insert(mortonCode.end(), segmentMortonCodes.begin(), segmentMortonCodes.end());
+    }
+
+    return mortonCode;
+}
+
 
 
 
@@ -185,30 +219,73 @@ int main() {
     vector<Point> dataPoints;
     readFromCSV(filenames, dataPoints);
 
-    // Morton encoding
-    vector<pair<int, uint64_t>> mortonCode;    // corresponding to each dataPoints, (index, mortoncode)
-    for (int i=0; i<dataPoints.size(); i++) {
-        Point& point = dataPoints[i];
-        uint64_t code = point.mortonCode(point.x, point.y, point.z, bounds.min.x, bounds.min.y, bounds.min.z, bounds.max.x, bounds.max.y, bounds.max.z);
-        mortonCode.push_back(make_pair(i, code));
-    }
+    auto start10 = chrono::high_resolution_clock::now();
+
+    // Morton encoding, corresponding to each dataPoints, (index, mortoncode)
+    vector<pair<int, uint64_t>> mortonCode = computeMortonCodesMultithreaded(dataPoints, bounds);
     
+    auto stop10 = chrono::high_resolution_clock::now();
+
     // Sort based on Morton code
     radixSort(mortonCode);
-    
+
 
     // Tree Variable Settings
     int maxDepth = 10;
-    int maxPointsPerLeaf = 6000;
+    int maxPointsPerLeaf = 10000;
+
 
     Octree octree(bounds, maxDepth, maxPointsPerLeaf);
 
+    auto start1 = chrono::high_resolution_clock::now();
     octree.constructOctree(dataPoints, mortonCode);
+    auto stop1 = chrono::high_resolution_clock::now();
+    
+    //octree.visualize("Test 1");
+
+    auto start2 = chrono::high_resolution_clock::now();
     octree.rebalance(dataPoints);
     octree.trim(dataPoints);
+    auto stop2 = chrono::high_resolution_clock::now();
+
+    octree.visualize("Test 2");
+    
+    auto start3 = chrono::high_resolution_clock::now();
+    octree.buildRtrees(dataPoints);
+    auto stop3 = chrono::high_resolution_clock::now();
+
+    // Measure range query time
+    Bounds queryRange;
+    vector<Point> queryResults;
+    int searchSize = 50;
+    queryRange.min = Point(bounds.getCenter().x - searchSize, bounds.getCenter().y - searchSize, bounds.getCenter().z - searchSize); 
+    queryRange.max = Point(bounds.getCenter().x + searchSize, bounds.getCenter().y + searchSize, bounds.getCenter().z + searchSize);  
+
+    auto start4 = chrono::high_resolution_clock::now();
+    octree.executeRangeQuery(queryRange, queryResults);
+    auto stop4 = chrono::high_resolution_clock::now();
+
+    
+
+    // Calculate durations
+    auto constructionDuration = chrono::duration_cast<chrono::milliseconds>(stop1 - start1);
+    auto rebalanceDuration = chrono::duration_cast<chrono::milliseconds>(stop2 - start2);
+    auto buildRDuration = chrono::duration_cast<chrono::milliseconds>(stop3 - start3);
+    auto queryDuration = chrono::duration_cast<chrono::milliseconds>(stop4 - start4);
+
+    auto mortonDuration = chrono::duration_cast<chrono::milliseconds>(stop10 - start10);
 
 
 
+    // Open CSV file for output in append mode
+    ofstream csvFile("octree_timing_results_bottom.csv", ios_base::app); 
+    csvFile << "ConstructionTime(ms),RebalanceTime(ms),RtreeTime(ms),RangeQueryTime(ms),MortonEncodingTime(ms)\n";
+    csvFile << constructionDuration.count() << "," << rebalanceDuration.count() << "," << buildRDuration.count() << "," << queryDuration.count() << "," << mortonDuration.count() << "\n";
+    
+    //csvFile << constructionDuration.count() << "," << rebalanceDuration.count() << "," << mortonDuration.count() << "\n";
+
+
+    csvFile.close();
     return 0;
 }
 
