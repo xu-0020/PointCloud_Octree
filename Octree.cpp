@@ -258,7 +258,7 @@ void Octree::mergeUnderpopulatedNodes(OctreeNode* node, int depth, int startDept
 }
 
 
-void Octree::rangeQuery(Bounds& queryRange, vector<Point>& results, OctreeNode* node, int depth) {
+void Octree::rangeQuery(Bounds& queryRange, vector<Point>& results, OctreeNode* node, int depth, float start=-1, float end=-1) {
     // Check if the current node's bounds intersect with the query range
     if (!node->bound.intersects(queryRange)) {
         return;
@@ -266,10 +266,8 @@ void Octree::rangeQuery(Bounds& queryRange, vector<Point>& results, OctreeNode* 
 
     if (node->isLeaf()) {
         // If it's a leaf node, query the R-tree
-        if (node->rtree) {
-            vector<Point> rtreeResults;
-            RSearch(node->rtree, rtreeResults, queryRange);
-            results.insert(results.end(), rtreeResults.begin(), rtreeResults.end());    // Use move iterators to save memory
+        if (node->hrtree) {
+            node->hrtree->HRTreeSearch(start, end, results, queryRange);
         } 
     } 
     else {
@@ -345,8 +343,7 @@ void Octree::initializeRTrees(OctreeNode* node, vector<future<void>>& futures) {
             // Regenerate bounds for the leaf node to ensure tight fitting
             node->bound = calculateBoundsForPoints(node->points);
 
-            node->rtree = new RTreePoints();
-            RInsert(node->rtree, node->points);
+            node->hrtree = new HRTree(node->points);
             node->points.clear(); // Clear points after moving them to R-tree to save memory
         }));
     } else {

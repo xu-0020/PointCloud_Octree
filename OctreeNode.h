@@ -1,10 +1,7 @@
 #include <vector>
 #include <future>
 
-#include "Point.h"
-#include "Bound.h"
-#include "RTree.h"
-
+#include "HRTree.cpp"
 typedef RTree<Point, float, 3> RTreePoints;
 typedef Point ValueType;
 
@@ -12,7 +9,7 @@ struct OctreeNode {
     Bounds bound;                               // Bounding box of the node
     vector<Point> points;                       // Points contained in this node
     OctreeNode* children[8] = {nullptr};        // Pointers to octants
-    RTreePoints* rtree = nullptr;               // R-tree in this leaf node
+    HRTree* hrtree = nullptr;               // R-tree in this leaf node
 
     OctreeNode() {}
 
@@ -23,8 +20,8 @@ struct OctreeNode {
             delete child;
             child = nullptr;
         }
-        delete rtree; 
-        rtree = nullptr;
+        delete hrtree; 
+        hrtree = nullptr;
     }
 
     bool isLeaf() const {

@@ -30,7 +30,7 @@ private:
     Bounds calculateBoundsForPoints(const vector<Point>& points);
 
     // Range Query function
-    void rangeQuery(Bounds& queryRange, vector<Point>& results, OctreeNode* node, int depth = 0);
+    void rangeQuery(Bounds& queryRange, vector<Point>& results, OctreeNode* node, int depth, float start, float end);
 
     // Function to create R-trees for each leaf node
     void initializeRTrees(OctreeNode* node, vector<future<void>>& futures);
