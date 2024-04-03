@@ -73,11 +73,13 @@ void processFileAndInsertPoints(const string& filename, vector<Point>& dataPoint
         float x = stof(values[0]);
         float y = stof(values[1]);
         float z = stof(values[2]);
-        int r = stoi(values[3]);
-        int g = stoi(values[4]);
-        int b = stoi(values[5]);
-        string source = values[6];
-        Point point(x, y, z, r, g, b, source);
+        //int r = stoi(values[3]);
+        //int g = stoi(values[4]);
+        //int b = stoi(values[5]);
+        //string source = values[6];
+        //Point point(x, y, z, r, g, b, source);
+
+        Point point(x, y, z);
 
         // Synchronize access
         lock_guard<mutex> guard(dataMutex);
@@ -218,6 +220,7 @@ int main() {
     // Read from CSV data
     vector<Point> dataPoints;
     readFromCSV(filenames, dataPoints);
+    
 
     auto start10 = chrono::high_resolution_clock::now();
 
@@ -232,7 +235,7 @@ int main() {
 
     // Tree Variable Settings
     int maxDepth = 10;
-    int maxPointsPerLeaf = 10000;
+    int maxPointsPerLeaf = 6000;
 
 
     Octree octree(bounds, maxDepth, maxPointsPerLeaf);
@@ -286,6 +289,8 @@ int main() {
 
 
     csvFile.close();
+
+    
     return 0;
 }
 

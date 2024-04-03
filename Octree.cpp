@@ -292,8 +292,7 @@ void Octree::mergeUnderpopulatedNodes(OctreeNode* node, int depth, const vector<
         node->points.swap(mergedPointIndices);  
         node->convertToLeaf();  
     }
-    /*
-    // Not Improving the performance
+    
     else if (allChildrenAreLeaves) {    // if some children combined have less than max threshold, combine them
         // sort children
         vector<pair<int, int>> childPointCounts;
@@ -340,7 +339,8 @@ void Octree::mergeUnderpopulatedNodes(OctreeNode* node, int depth, const vector<
             node->children[i] = nullptr;
         }
     }
-    
+    /*
+    // Not Improving the performance
     else {
         vector<OctreeNode*> leafNodes;
         vector<OctreeNode*> internalNodes;
