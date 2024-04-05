@@ -1,6 +1,8 @@
 #pragma once
 #include <string>
 #include <iostream>
+#include <cstdint>
+
 
 using namespace std;
 
@@ -25,6 +27,7 @@ struct Point {
         this->arrT[2] = z;
         this->arrT[3] = time;
     }
+
     void print_point(){
         if (time==-1){
             cout << "x = " <<x << " y = " << y << " z = " << z << " r = " << r << " g = " << g << " b = " << b << endl;
@@ -34,5 +37,33 @@ struct Point {
         }
         
     }
+
+    // Morton Enconding functions
+    uint64_t mortonCode(float x, float y, float z, float minX, float minY, float minZ, float maxX, float maxY, float maxZ) const {
+        uint32_t normX = normalizeCoordinate(x, minX, maxX);
+        uint32_t normY = normalizeCoordinate(y, minY, maxY);
+        uint32_t normZ = normalizeCoordinate(z, minZ, maxZ);
+        return interleaveBits(normX, normY, normZ);
+    }
+
+private:
+
+    // Normalize the coordinate to [0, 2^32)
+    uint32_t normalizeCoordinate(float coord, float minCoord, float maxCoord) const {
+        const uint32_t maxRange = 0xFFFFFFFF; // 2^32 - 1
+        return static_cast<uint32_t>((coord - minCoord) / (maxCoord - minCoord) * maxRange);    // Min-max normalization
+    }
+
+    uint64_t interleaveBits(uint32_t x, uint32_t y, uint32_t z) const {
+        uint64_t result = 0;
+        for (uint64_t i = 0; i < 21; i++) {     // Limit to 21 bits to avoid overflow
+            result |= ((x & ((uint32_t)1 << i)) << (2 * i)) |
+                    ((y & ((uint32_t)1 << i)) << (2 * i + 1)) |
+                    ((z & ((uint32_t)1 << i)) << (2 * i + 2));
+        }
+        return result;
+    }
+
+
 };
 
