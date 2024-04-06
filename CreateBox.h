@@ -43,26 +43,27 @@ Bounds computeBoundingBoxFromSingleCSV(const string& filename) {
 }
 
 
-Bounds computeTotalBoundingBox(const vector<string>& filenames) {
-    // Acquiring the bounding box of entire datasets.
-    vector<future<Bounds>> futureBounds;
-    // Launch a task for each file
-    for (const auto& filename : filenames) {
-        futureBounds.push_back(async(launch::async, computeBoundingBoxFromSingleCSV, filename));
-    }
-    Bounds bounds;
-    bool firstBounds = true;
+// Bounds computeTotalBoundingBox(const vector<string>& filenames) {
+//     // Acquiring the bounding box of entire datasets.
+//     vector<future<Bounds>> futureBounds;
+//     // Launch a task for each file
+//     for (const auto& filename : filenames) {
+//         futureBounds.push_back(async(launch::async, computeBoundingBoxFromSingleCSV, filename));
+//     }
+//     Bounds bounds;
+//     bool firstBounds = true;
 
-    // Wait for all tasks to complete and merge the results
-    for (auto& fb : futureBounds) {
-        Bounds b = fb.get();    // Block until the future is ready
-        if (firstBounds) {
-            bounds = b;
-            firstBounds = false;
-        } else {
-            bounds.update(b.min);
-            bounds.update(b.max);
-        }
-    }
-    // Boundingbox acquired.
-}
+//     // Wait for all tasks to complete and merge the results
+//     for (auto& fb : futureBounds) {
+//         Bounds b = fb.get();    // Block until the future is ready
+//         if (firstBounds) {
+//             bounds = b;
+//             firstBounds = false;
+//         } else {
+//             bounds.update(b.min);
+//             bounds.update(b.max);
+//         }
+//     }
+//     // Boundingbox acquired.
+
+// }
