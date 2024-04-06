@@ -47,8 +47,8 @@ private:
     void insert(OctreeNode* node, int pointIdx, int depth, const vector<Point>& dataPoints);
 
 public:
-    Octree(Bounds bound, int maxDepth, int maxPoints) : maxDepth(maxDepth), maxPointsPerNode(maxPoints) {
-        root = new OctreeNode(bound);
+    Octree(int maxDepth, int maxPoints) : maxDepth(maxDepth), maxPointsPerNode(maxPoints) {
+        root = new OctreeNode();
     };
 
     ~Octree() {
