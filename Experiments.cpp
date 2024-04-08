@@ -10,6 +10,10 @@
 #include <sys/stat.h>
 #include <cstring>
 #include <experimental/filesystem>
+#include <random>
+#include "KdTree.cpp"
+using namespace std;
+#include "Octree_kd.cpp"
 namespace fs = std::experimental::filesystem;
 void write_result(string filename, list<string> results){
     std::ofstream outputFile(filename, std::ios::trunc);
@@ -33,7 +37,7 @@ std::unordered_map<std::string, float> Summary(vector<Point> points){
         points.begin(),
         points.end(),
         [](Point& a, Point& b) {
-            return a.time < b.time;
+            return a.x < b.x;
         }
     );
     auto minXPoint = std::max_element(
@@ -80,6 +84,20 @@ std::unordered_map<std::string, float> Summary(vector<Point> points){
     return summary;
 
 
+}
+
+std::vector<Point> getRandomPoints(const std::vector<Point>& data, int count) {
+    std::vector<Point> randomPoints;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, data.size() - 1);
+
+    for (int i = 0; i < count; ++i) {
+        int index = dis(gen);
+        randomPoints.push_back(data[index]);
+    }
+
+    return randomPoints;
 }
 
 vector<Point> GetDataFromSingleCSV(const string& filename){
@@ -163,7 +181,28 @@ Octree buildTree(vector<Point> dataPoints,const Bounds bounds) {
     return octree;
 }
 
-void runQuery(Bounds& queryRange, vector<Point>& results, Octree octree) {
+
+Octree_kd buildTree_kd(vector<Point> dataPoints,const Bounds bounds) {
+    Octree_kd octree(bounds, 10, 13000, 9000);
+
+    // Tree Variable Settings
+    int maxDepth = 10;
+    int maxPointsPerLeaf = 6000;
+    for (Point& point : dataPoints) {
+        octree.insert(point);
+    }
+    return octree;
+}
+
+
+
+
+void runQuery(Bounds& queryRange, vector<Point>& results, Octree& octree) {
+    octree.executeRangeQuery(queryRange, results);
+}
+
+
+void runQuery_kd(Bounds& queryRange, vector<Point>& results, Octree_kd& octree) {
     octree.executeRangeQuery(queryRange, results);
 }
 
@@ -715,11 +754,15 @@ int Octree::getOctant(const Point& origin, int pointIdx, const vector<Point>& da
 
 
 int main() {
+    
+
     // Read in data.
     auto startTime = std::chrono::high_resolution_clock::now();
     cout << "----------------------------------Reading data---------------------------------" << endl; 
     string folderPath = "/export/project/hjingaa/PointCloud_Octree/data_csv/Montreal"; // 替换为实际的文件夹路径
     vector<Point> points = GetDataFromSingleFolder(folderPath);
+    // vector<Point> points = GetDataFromSingleCSV("/export/project/hjingaa/PointCloud_Octree/data_csv/Montreal/TileO01_2013.csv");
+
     auto endTime = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
     cout<< "Reading data cost                        "  <<duration.count()<< "ms"<<endl;
@@ -729,7 +772,7 @@ int main() {
     // Print the summary data.
     cout << "maxX = " << map["maxX"] << " " << "minX = " << map["minX"] << " " << "maxY = " << map["maxY"] << " " << "minY = " << map["minY"] << " " << "maxZ = " << map["maxZ"] << " " << "minZ = " << map["minZ"] << " " << endl;
     Bounds maxBound = Bounds(Point(map["minX"], map["minY"], map["minZ"]), Point(map["maxX"], map["maxY"], map["maxZ"]));
-    
+
     // Build the Octree+Rtree
     cout << "----------------------------------Build the Octree+Rtree---------------------------------" << endl; 
     startTime = std::chrono::high_resolution_clock::now();
@@ -739,33 +782,88 @@ int main() {
     cout<< "Building the Octree+Rtree cost            "  <<duration.count()<< "ms"<<endl;
 
 
+    // RTree test
+    cout << "----------------------------------Build the Rtree---------------------------------" << endl; 
+    startTime = std::chrono::high_resolution_clock::now();
+    RTreePoints* Rtree = new RTreePoints;
+    RInsert(Rtree, points);
+    endTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+    cout<< "Buiding the Rtree cost                        "  <<duration.count()<< "ms"<<endl;
+
+    // OcTree+KDTree test
+    cout << "----------------------------------Build the Octree+KDtree---------------------------------" << endl; 
+    startTime = std::chrono::high_resolution_clock::now();
+
+    Octree_kd oktree = buildTree_kd(points, maxBound);
+    endTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+    cout<< "Buiding the Octree+KDtree cost                        "  <<duration.count()<< "ms"<<endl;
+
     // Octree+Rtree Coordinate test.
     cout << "----------------------------------Begin the experiments---------------------------------" << endl; 
-    std::list<string> result_time_cost;
-    for (float i = 1.0; i < 100; i++){
-        std::vector<Point> results;
-        
+    std::list<string> result_time_cost_or;
+    std::list<string> result_time_cost_r;
+    std::list<string> result_time_cost_ok;
+    for (float i = 1.0; i < 100.0; i++){
+        std::vector<Point> results_or;
+        std::vector<Point> results_r;
+        std::vector<Point> results_ok;
+
+        // Get the random points.
+        std::vector<Point> query_points = getRandomPoints(points, i * points.size() / 10000.0);
+        std::unordered_map<std::string, float> query_map = Summary(query_points);
+
         // Compoute the bound in this loop.
-        float tmp_minX = (143.0+i * 57.0/100.0) / 200.0 * map["minX"] + (57.0-i * 57.0/100.0) / 200.0 * map["maxX"];
-        float tmp_maxX = (57.0-i * 57.0/100.0) / 200.0 * map["minX"] + (143.0+i * 57.0/100.0) / 200.0 * map["maxX"];
-        float tmp_minY = (143.0+i * 57.0/100.0) / 200.0 * map["minY"] + (57.0-i * 57.0/100.0) / 200.0 * map["maxY"];
-        float tmp_maxY = (57.0-i * 57.0/100.0) / 200.0 * map["minY"] + (143.0+i * 57.0/100.0) / 200.0 * map["maxY"];
-        float tmp_minZ = (143.0+i * 57.0/100.0) / 200.0 * map["minZ"] + (57.0-i * 57.0/100.0) / 200.0 * map["maxZ"];
-        float tmp_maxZ = (57.0-i * 57.0/100.0) / 200.0 * map["minZ"] + (143.0+i * 57.0/100.0) / 200.0 * map["maxZ"];
+        float tmp_minX = query_map["minX"];
+        float tmp_maxX = query_map["maxX"];
+        float tmp_minY = query_map["minY"];
+        float tmp_maxY = query_map["maxY"];
+        float tmp_minZ = query_map["minZ"];
+        float tmp_maxZ = query_map["maxZ"];
         Point pmin = Point(tmp_minX, tmp_minY, tmp_minZ);
         Point pmax = Point(tmp_maxX, tmp_maxY, tmp_maxZ);
         Bounds bound = Bounds(pmin, pmax);
+
+
+
         auto startTime = std::chrono::high_resolution_clock::now();
-        runQuery(bound, results, tree);
+        runQuery(bound, results_or, tree);
         auto endTime = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
         // Make the bounds words
-        string bound_words = "The bound is (" + to_string(tmp_minX) + ", " + to_string(tmp_maxX) + "), (" + to_string(tmp_minY) + ", " + to_string(tmp_maxY) + "), (" + to_string(tmp_minZ) + ", " + to_string(tmp_maxZ) + ")." + " Time cost = " + to_string(duration.count())+" microseconds." + "find " + to_string(results.size()) + " points.";
-        result_time_cost.push_back(bound_words);
-        cout << bound_words << endl;
+        string bound_words_or = "ORORORThe bound is (" + to_string(tmp_minX) + ", " + to_string(tmp_maxX) + "), (" + to_string(tmp_minY) + ", " + to_string(tmp_maxY) + "), (" + to_string(tmp_minZ) + ", " + to_string(tmp_maxZ) + ")." + " Time cost = " + to_string(duration.count())+" microseconds." + "find " + to_string(results_or.size()) + " points.";
+        result_time_cost_or.push_back(bound_words_or);
+        // cout << bound_words_or << endl;
+
+
+
+
+        auto startTime_r = std::chrono::high_resolution_clock::now();
+        RSearch(Rtree, results_r, bound);
+        auto endTime_r = std::chrono::high_resolution_clock::now();
+        auto duration_r = std::chrono::duration_cast<std::chrono::microseconds>(endTime_r - startTime_r);
+        // Make the bounds words
+        string bound_words_r = "RRRThe bound is (" + to_string(tmp_minX) + ", " + to_string(tmp_maxX) + "), (" + to_string(tmp_minY) + ", " + to_string(tmp_maxY) + "), (" + to_string(tmp_minZ) + ", " + to_string(tmp_maxZ) + ")." + " Time cost = " + to_string(duration_r.count())+" microseconds." + "find " + to_string(results_r.size()) + " points.";
+        result_time_cost_r.push_back(bound_words_r);
+        // cout << bound_words_r << endl;
+
+
+        auto startTime_ok = std::chrono::high_resolution_clock::now();
+        runQuery_kd(bound, results_ok, oktree);
+        // RSearch(Rtree, results_r, bound);
+        auto endTime_ok = std::chrono::high_resolution_clock::now();
+        auto duration_ok = std::chrono::duration_cast<std::chrono::microseconds>(endTime_ok - startTime_ok);
+        // Make the bounds words
+        string bound_words_ok = "OKOKOKThe bound is (" + to_string(tmp_minX) + ", " + to_string(tmp_maxX) + "), (" + to_string(tmp_minY) + ", " + to_string(tmp_maxY) + "), (" + to_string(tmp_minZ) + ", " + to_string(tmp_maxZ) + ")." + " Time cost = " + to_string(duration_ok.count())+" microseconds." + "find " + to_string(results_r.size()) + " points.";
+        result_time_cost_ok.push_back(bound_words_ok);
+        // cout << bound_words_ok << endl;
     }
-    write_result("result_montreal/Result_O+R.txt", result_time_cost);
+    write_result("result_montreal/Result_O+R.txt", result_time_cost_or);
+    write_result("result_montreal/Result_R.txt", result_time_cost_r);
+    write_result("result_montreal/Result_OK.txt", result_time_cost_ok);
 
 
+    
     return 0;
 }
