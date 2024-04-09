@@ -17,7 +17,7 @@ vector<pair<int, uint64_t>> computeMortonCodesSegment(const vector<Point>& dataP
     return segmentMortonCodes;
 }
 
-vector<pair<int, uint64_t>> computeMortonCodesMultithreaded(const vector<Point>& dataPoints, const Bounds& bounds) {
+vector<pair<int, uint64_t>> computeMortonCodesMultithreaded(const vector<Point>& dataPoints, const Bounds bounds) {
     const size_t segmentSize = ceil(dataPoints.size() / static_cast<double>(max_concurrent_tasks));
 
     vector<future<vector<pair<int, uint64_t>>>> futures;

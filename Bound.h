@@ -1,10 +1,14 @@
 #pragma once
+#ifndef BOUNDS_H
+#define BOUNDS_H
+
 
 #include <vector>
 #include <algorithm>
 #include <cmath> 
 
 #include "Point.h"
+
 
 
 struct Bounds {
@@ -67,3 +71,6 @@ struct Bounds {
 };
 
 
+
+
+#endif  // BOUNDS_H
