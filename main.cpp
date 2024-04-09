@@ -8,6 +8,7 @@
 #include "MortonEncoding.h"
 #include "RadixSort.h"
 #include "CreateBox.h"
+
 using namespace std;
 
 #include <filesystem>
@@ -128,71 +129,78 @@ int main() {
     vector<Point> dataPoints;
     readFromCSV(filenames, dataPoints);
 
-    auto start10 = chrono::high_resolution_clock::now();
 
-    // Morton encoding, corresponding to each dataPoints, (index, mortoncode)
-    vector<pair<int, uint64_t>> mortonCode = computeMortonCodesMultithreaded(dataPoints, bounds);
-
-    auto stop10 = chrono::high_resolution_clock::now();
-
-    // Sort based on Morton code
-    radixSort(mortonCode);
+    // Open CSV file for output in append mode
+    ofstream csvFile("octree_timing_results_bottom.csv", ios_base::app); 
 
 
     // Tree Variable Settings
     int maxDepth = 10;
-    int maxPointsPerLeaf = 6000;
+    vector<int> maxPointsPerLeaf = {4000, 6000, 8000, 10000};
+
+    for (int i=0; i<5; i++) {
+        for (int j=0; j<maxPointsPerLeaf.size(); j++) {
+
+            auto start10 = chrono::high_resolution_clock::now();
+
+            // Morton encoding, corresponding to each dataPoints, (index, mortoncode)
+            vector<pair<int, uint64_t>> mortonCode = computeMortonCodesMultithreaded(dataPoints, bounds);
+
+            auto stop10 = chrono::high_resolution_clock::now();
+
+            // Sort based on Morton code
+            radixSort(mortonCode);
 
 
-    Octree octree(maxDepth, maxPointsPerLeaf);
+            Octree octree(maxDepth, maxPointsPerLeaf[j]);
 
-    auto start1 = chrono::high_resolution_clock::now();
-    octree.constructOctree(dataPoints, mortonCode);
-    auto stop1 = chrono::high_resolution_clock::now();
-    
-    //octree.visualize("Test 1");
+            auto start1 = chrono::high_resolution_clock::now();
+            octree.constructOctree(dataPoints, mortonCode);
+            auto stop1 = chrono::high_resolution_clock::now();
+            
+            //octree.visualize("Test 1");
 
-    auto start2 = chrono::high_resolution_clock::now();
-    octree.rebalance(dataPoints);
-    octree.trim(dataPoints);
-    auto stop2 = chrono::high_resolution_clock::now();
+            auto start2 = chrono::high_resolution_clock::now();
+            octree.rebalance(dataPoints);
+            octree.trim(dataPoints);
+            auto stop2 = chrono::high_resolution_clock::now();
 
-    octree.visualize("Test 2");
-    
-    auto start3 = chrono::high_resolution_clock::now();
-    octree.buildRtrees(dataPoints);
-    auto stop3 = chrono::high_resolution_clock::now();
+            octree.visualize("Test 2");
+            
+            auto start3 = chrono::high_resolution_clock::now();
+            octree.buildRtrees(dataPoints);
+            auto stop3 = chrono::high_resolution_clock::now();
 
-    // Measure range query time
-    Bounds queryRange;
-    vector<Point> queryResults;
-    int searchSize = 50;
-    queryRange.min = Point(bounds.getCenter().x - searchSize, bounds.getCenter().y - searchSize, bounds.getCenter().z - searchSize); 
-    queryRange.max = Point(bounds.getCenter().x + searchSize, bounds.getCenter().y + searchSize, bounds.getCenter().z + searchSize);  
+            // Measure range query time
+            Bounds queryRange;
+            vector<Point> queryResults;
+            int searchSize = 50;
+            queryRange.min = Point(bounds.getCenter().x - searchSize, bounds.getCenter().y - searchSize, bounds.getCenter().z - searchSize); 
+            queryRange.max = Point(bounds.getCenter().x + searchSize, bounds.getCenter().y + searchSize, bounds.getCenter().z + searchSize);  
 
-    auto start4 = chrono::high_resolution_clock::now();
-    octree.executeRangeQuery(queryRange, queryResults);
-    auto stop4 = chrono::high_resolution_clock::now();
+            auto start4 = chrono::high_resolution_clock::now();
+            octree.executeRangeQuery(queryRange, queryResults);
+            auto stop4 = chrono::high_resolution_clock::now();
 
-    
+            
 
-    // Calculate durations
-    auto constructionDuration = chrono::duration_cast<chrono::milliseconds>(stop1 - start1);
-    auto rebalanceDuration = chrono::duration_cast<chrono::milliseconds>(stop2 - start2);
-    auto buildRDuration = chrono::duration_cast<chrono::milliseconds>(stop3 - start3);
-    auto queryDuration = chrono::duration_cast<chrono::milliseconds>(stop4 - start4);
+            // Calculate durations
+            auto constructionDuration = chrono::duration_cast<chrono::milliseconds>(stop1 - start1);
+            auto rebalanceDuration = chrono::duration_cast<chrono::milliseconds>(stop2 - start2);
+            auto buildRDuration = chrono::duration_cast<chrono::milliseconds>(stop3 - start3);
+            auto queryDuration = chrono::duration_cast<chrono::milliseconds>(stop4 - start4);
 
-    auto mortonDuration = chrono::duration_cast<chrono::milliseconds>(stop10 - start10);
+            auto mortonDuration = chrono::duration_cast<chrono::milliseconds>(stop10 - start10);
 
 
+            csvFile << "ConstructionTime(ms),RebalanceTime(ms),RtreeTime(ms),RangeQueryTime(ms),MortonEncodingTime(ms)\n";
 
-    // Open CSV file for output in append mode
-    ofstream csvFile("octree_timing_results_bottom.csv", ios_base::app); 
-    csvFile << "ConstructionTime(ms),RebalanceTime(ms),RtreeTime(ms),RangeQueryTime(ms),MortonEncodingTime(ms)\n";
-    csvFile << constructionDuration.count() << "," << rebalanceDuration.count() << "," << buildRDuration.count() << "," << queryDuration.count() << "," << mortonDuration.count() << "\n";
-    
-    //csvFile << constructionDuration.count() << "," << rebalanceDuration.count() << "," << mortonDuration.count() << "\n";
+            csvFile << constructionDuration.count() << "," << rebalanceDuration.count() << "," << buildRDuration.count() << "," << queryDuration.count() << "," << mortonDuration.count() << "\n";
+            //csvFile << constructionDuration.count() << "," << rebalanceDuration.count() << "," << mortonDuration.count() << "\n";
 
+
+        }
+    }
 
     csvFile.close();
 

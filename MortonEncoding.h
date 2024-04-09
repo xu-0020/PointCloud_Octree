@@ -1,10 +1,7 @@
-#include <vector>
-#include <cstdint>
 #include <math.h>
 #include <future>
 
 #include "Bound.h"
-#include "Point.h"
 
 const size_t max_concurrent_tasks = 30;     // concurrency control
 

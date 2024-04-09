@@ -64,8 +64,15 @@ vector<OctreeNode*> Octree::createLeafNodesMultithreaded(const vector<Point>& da
     const size_t numThreads = 32;
     const size_t segmentSize = ceil(mortonCode.size() / static_cast<double>(numThreads));
 
-    uint64_t numberOfGrid = pow(8, maxDepth);    // Number of grids at the maximum depth
-    uint64_t gridSize = (pow(2, 32) - 1) / numberOfGrid;     // Grid size for the current depth
+    // Assume morton code sorted
+    // Calculate the grid size based on the range of Morton codes
+    uint64_t maxMortonCode = mortonCode.back().second;  // Assuming mortonCode is sorted
+    uint64_t minMortonCode = mortonCode.front().second;
+    uint64_t codeRange = maxMortonCode - minMortonCode;
+    // Ensure at least one grid per point for the maximum possible division
+    uint64_t numberOfGrids = min(codeRange, static_cast<uint64_t>(dataPoints.size()));
+    uint64_t gridSize = codeRange / numberOfGrids;  // Adjust grid size based on actual code range
+
 
     vector<future<vector<OctreeNode*>>> futures;
 
@@ -120,8 +127,8 @@ vector<OctreeNode*> Octree::createLeafNodesSegment(const vector<Point>& dataPoin
 
 
 
-void Octree::buildFromLeafNodes(vector<OctreeNode*>& nodes, int currentDepth) {
-    if (nodes.size() <= 1 || currentDepth == 0) {
+void Octree::buildFromLeafNodes(vector<OctreeNode*>& nodes) {
+    if (nodes.size() <= 1) {
         // If there's only one node left or we've reached the maximum depth, this is the root
         if (!nodes.empty()) {
             OctreeNode* head = nodes.front();
@@ -134,7 +141,7 @@ void Octree::buildFromLeafNodes(vector<OctreeNode*>& nodes, int currentDepth) {
     }
 
     vector<OctreeNode*> parentNodes;
-    uint32_t parentCount = ceil(nodes.size() / 8.0);  // Calculate the number of parent nodes needed
+    uint32_t parentCount = ceil(static_cast<double>(nodes.size()) / 8.0);  // Calculate the number of parent nodes needed
 
     for (int i = 0; i < parentCount; i++) {     // Loop over each parent node
         Bounds parentBounds;
@@ -189,7 +196,7 @@ void Octree::buildFromLeafNodes(vector<OctreeNode*>& nodes, int currentDepth) {
     }
     
     // Recursively build the tree
-    buildFromLeafNodes(parentNodes, currentDepth - 1);
+    buildFromLeafNodes(parentNodes);
 }
 
 
@@ -408,7 +415,7 @@ void Octree::subdivideAndInsert(OctreeNode* node, int pointIdx, int depth, const
 }
 
 void Octree::insert(OctreeNode* node, int pointIdx, int depth, const vector<Point>& dataPoints) {
-    if (node->points.size() < maxPointsPerNode * 1.5 || depth >= maxDepth * 1.5) {
+    if (node->points.size() < maxPointsPerNode * 1.5 || depth >= maxDepth * 1.2) {
         node->points.push_back(pointIdx);
         return;
     }

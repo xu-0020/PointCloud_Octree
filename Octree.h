@@ -16,7 +16,7 @@ private:
     vector<OctreeNode*> createLeafNodesSegment(const vector<Point>& dataPoints, const vector<pair<int, uint64_t>>& mortonCode, size_t start, size_t end, uint64_t gridSize);
 
     // Function to build the tree from leaf nodes
-    void buildFromLeafNodes(vector<OctreeNode*>& leafNodes, int depth);
+    void buildFromLeafNodes(vector<OctreeNode*>& leafNodes);
 
     // Function to merge underpopulated leaf nodes
     void mergeUnderpopulatedNodes(OctreeNode* node, int depth, const vector<Point>& dataPoints);
@@ -60,7 +60,7 @@ public:
         vector<OctreeNode*> leafNodes = createLeafNodesMultithreaded(dataPoints, mortonCode);
 
         // Recursively build the tree from leaf nodes
-        buildFromLeafNodes(leafNodes, maxDepth);
+        buildFromLeafNodes(leafNodes);
     }
 
     // Function to rebalance the octree (divide the cluster at the bottom)

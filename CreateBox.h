@@ -1,7 +1,5 @@
-#include <iostream>
 #include <fstream>
 #include <sstream>
-#include <string>
 #include <future>
 
 #include "Bound.h"
@@ -65,4 +63,5 @@ Bounds computeTotalBoundingBox(const vector<string>& filenames) {
         }
     }
     // Boundingbox acquired.
+    return bounds;
 }
