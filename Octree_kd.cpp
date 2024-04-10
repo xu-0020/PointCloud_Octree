@@ -228,6 +228,7 @@ void Octree_kd::initializeRTrees(OctreeNode_kd* node) {
 void Octree_kd::initializeKdTrees(OctreeNode_kd* node){
     if (node->isLeaf()){
         node->kdtree = new KdTree();
+        KdInsert(node->kdtree, node->points);
     }
     else {
         for (int i = 0; i < 8; i++){
