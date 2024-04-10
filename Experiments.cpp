@@ -191,6 +191,7 @@ Octree_kd buildTree_kd(vector<Point> dataPoints,const Bounds bounds) {
     for (Point& point : dataPoints) {
         octree.insert(point);
     }
+    octree.buildKdtrees();
     return octree;
 }
 
