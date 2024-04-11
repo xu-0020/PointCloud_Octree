@@ -191,6 +191,7 @@ Octree_kd buildTree_kd(vector<Point> dataPoints,const Bounds bounds) {
     for (Point& point : dataPoints) {
         octree.insert(point);
     }
+    octree.buildKdtrees();
     return octree;
 }
 
@@ -675,7 +676,7 @@ int main() {
     // Read in data.
     auto startTime = std::chrono::high_resolution_clock::now();
     cout << "----------------------------------Reading data---------------------------------" << endl; 
-    string folderPath = "/export/project/hjingaa/PointCloud_Octree/data_csv/tmp"; // 替换为实际的文件夹路径
+    string folderPath = "/export/project/hjingaa/PointCloud_Octree/data_csv/Montreal"; // 替换为实际的文件夹路径
     vector<Point> points = GetDataFromSingleFolder(folderPath);
     // vector<Point> points = GetDataFromSingleCSV("/export/project/hjingaa/PointCloud_Octree/data_csv/HK/demo.csv");
     cout<< "The number of points is " << points.size() << endl;
@@ -697,14 +698,14 @@ int main() {
     duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
     cout<< "Building the Octree+Rtree cost            "  <<duration.count()<< "ms"<<endl;
 
-    // // RTree test
-    // cout << "----------------------------------Build the Rtree---------------------------------" << endl;
-    // startTime = std::chrono::high_resolution_clock::now();
-    // RTreePoints* Rtree = new RTreePoints;
-    // RInsert(Rtree, points);
-    // endTime = std::chrono::high_resolution_clock::now();
-    // duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-    // cout<< "Buiding the Rtree cost                        "  <<duration.count()<< "ms"<<endl;
+    // RTree test
+    cout << "----------------------------------Build the Rtree---------------------------------" << endl;
+    startTime = std::chrono::high_resolution_clock::now();
+    RTreePoints* Rtree = new RTreePoints;
+    RInsert(Rtree, points);
+    endTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    cout<< "Buiding the Rtree cost                        "  <<duration.count()<< "ms"<<endl;
 
     // OcTree+KDTree test
     cout << "----------------------------------Build the Octree+KDtree---------------------------------" << endl; 
@@ -717,21 +718,21 @@ int main() {
     // Octree+Rtree Coordinate test.
     cout << "----------------------------------Begin the experiments---------------------------------" << endl; 
     std::list<string> result_time_cost_or;
-    // std::list<string> result_time_cost_r;
+    std::list<string> result_time_cost_r;
     std::list<string> result_time_cost_ok;
-    for (float i = 1.0; i < 100.0; i++){
+    for (float i = 1.0; i < 50.0; i++){
         std::vector<Point> results_or;
-        // std::vector<Point> results_r;
+        std::vector<Point> results_r;
         std::vector<Point> results_ok;
 
 
         // Compoute the bound in this loop.
-        float tmp_minX = (143.0+i * 57.0/100.0) / 200.0 * map["minX"] + (57.0-i * 57.0/100.0) / 200.0 * map["maxX"];
-        float tmp_maxX = (57.0-i * 57.0/100.0) / 200.0 * map["minX"] + (143.0+i * 57.0/100.0) / 200.0 * map["maxX"];
-        float tmp_minY = (143.0+i * 57.0/100.0) / 200.0 * map["minY"] + (57.0-i * 57.0/100.0) / 200.0 * map["maxY"];
-        float tmp_maxY = (57.0-i * 57.0/100.0) / 200.0 * map["minY"] + (143.0+i * 57.0/100.0) / 200.0 * map["maxY"];
-        float tmp_minZ = (143.0+i * 57.0/100.0) / 200.0 * map["minZ"] + (57.0-i * 57.0/100.0) / 200.0 * map["maxZ"];
-        float tmp_maxZ = (57.0-i * 57.0/100.0) / 200.0 * map["minZ"] + (143.0+i * 57.0/100.0) / 200.0 * map["maxZ"];
+        float tmp_minX = (143.0+i * 57.0/50.0) / 200.0 * map["minX"] + (57.0-i * 57.0/50.0) / 200.0 * map["maxX"];
+        float tmp_maxX = (57.0-i * 57.0/50.0) / 200.0 * map["minX"] + (143.0+i * 57.0/50.0) / 200.0 * map["maxX"];
+        float tmp_minY = (143.0+i * 57.0/50.0) / 200.0 * map["minY"] + (57.0-i * 57.0/50.0) / 200.0 * map["maxY"];
+        float tmp_maxY = (57.0-i * 57.0/50.0) / 200.0 * map["minY"] + (143.0+i * 57.0/50.0) / 200.0 * map["maxY"];
+        float tmp_minZ = (143.0+i * 57.0/50.0) / 200.0 * map["minZ"] + (57.0-i * 57.0/50.0) / 200.0 * map["maxZ"];
+        float tmp_maxZ = (57.0-i * 57.0/50.0) / 200.0 * map["minZ"] + (143.0+i * 57.0/50.0) / 200.0 * map["maxZ"];
         Point pmin = Point(tmp_minX, tmp_minY, tmp_minZ);
         Point pmax = Point(tmp_maxX, tmp_maxY, tmp_maxZ);
         Bounds bound = Bounds(pmin, pmax);
@@ -774,14 +775,14 @@ int main() {
         cout << bound_words_or << endl;
 
 
-        // auto startTime_r = std::chrono::high_resolution_clock::now();
-        // RSearch(Rtree, results_r, bound);
-        // auto endTime_r = std::chrono::high_resolution_clock::now();
-        // auto duration_r = std::chrono::duration_cast<std::chrono::microseconds>(endTime_r - startTime_r);
-        // // Make the bounds words
-        // string bound_words_r = "RRRThe bound is (" + to_string(tmp_minX) + ", " + to_string(tmp_maxX) + "), (" + to_string(tmp_minY) + ", " + to_string(tmp_maxY) + "), (" + to_string(tmp_minZ) + ", " + to_string(tmp_maxZ) + ")." + " Time cost = " + to_string(duration_r.count())+" microseconds." + "find " + to_string(results_r.size()) + " points.";
-        // result_time_cost_r.push_back(bound_words_r);
-        // cout << bound_words_r << endl;
+        auto startTime_r = std::chrono::high_resolution_clock::now();
+        RSearch(Rtree, results_r, bound);
+        auto endTime_r = std::chrono::high_resolution_clock::now();
+        auto duration_r = std::chrono::duration_cast<std::chrono::microseconds>(endTime_r - startTime_r);
+        // Make the bounds words
+        string bound_words_r = "RRRThe bound is (" + to_string(tmp_minX) + ", " + to_string(tmp_maxX) + "), (" + to_string(tmp_minY) + ", " + to_string(tmp_maxY) + "), (" + to_string(tmp_minZ) + ", " + to_string(tmp_maxZ) + ")." + " Time cost = " + to_string(duration_r.count())+" microseconds." + "find " + to_string(results_r.size()) + " points.";
+        result_time_cost_r.push_back(bound_words_r);
+        cout << bound_words_r << endl;
 
 
         auto startTime_ok = std::chrono::high_resolution_clock::now();
@@ -793,10 +794,10 @@ int main() {
         result_time_cost_ok.push_back(bound_words_ok);
         cout << bound_words_ok << endl;
     }
-    string file_path = "result_hkl/";
-    // write_result(file_path + "Result_OR.txt", result_time_cost_or);
-    // write_result(file_path + "Result_R.txt", result_time_cost_r);
-    // write_result(file_path + "Result_OK.txt", result_time_cost_ok);
+    string file_path = "result_montreal/";
+    write_result(file_path + "Result_OR.txt", result_time_cost_or);
+    write_result(file_path + "Result_R.txt", result_time_cost_r);
+    write_result(file_path + "Result_OK.txt", result_time_cost_ok);
 
 
     return 0;
