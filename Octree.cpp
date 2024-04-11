@@ -449,9 +449,8 @@ void Octree::rangeQuery(Bounds& queryRange, vector<Point>& results, OctreeNode* 
 }
 
 
-
 // Function to create R-trees for each leaf node with thread limitation
-void Octree::initializeRTrees(OctreeNode* node, vector<future<void>>& futures, const vector<Point>& dataPoints) {
+void Octree::initializeRTrees(OctreeNode* node, vector<future<void>>& futures, const vector<Point>& dataPoints, RTreeStats& stats) {
     if (node->isLeaf()) {
 
         // Check if reached the maximum number of concurrent tasks
@@ -474,7 +473,7 @@ void Octree::initializeRTrees(OctreeNode* node, vector<future<void>>& futures, c
         }
 
         // Launch a new task for R-tree construction in the leaf node
-        futures.push_back(async(launch::async, [this, node, &dataPoints]() {
+        futures.push_back(async(launch::async, [this, node, &dataPoints, &stats]() {
             // Regenerate bounds for the leaf node to ensure tight fitting
             node->bound = calculateBoundsForPoints(dataPoints, node->points);
 
@@ -483,18 +482,27 @@ void Octree::initializeRTrees(OctreeNode* node, vector<future<void>>& futures, c
             for (int i=0; i<node->points.size(); i++) {
                 insertPoints.push_back(dataPoints[node->points[i]]);
             }
+
+            // Update RTreeStats
+            {
+                lock_guard<mutex> guard(stats.mtx);
+                stats.totalLeafNodes += 1;
+                stats.totalPoints += insertPoints.size();
+                stats.minPoints = min(stats.minPoints, insertPoints.size());
+                stats.maxPoints = max(stats.maxPoints, insertPoints.size());
+            }
+
             node->points.clear();
             RInsert(node->rtree, insertPoints);
         }));
     } else {
         for (int i = 0; i < 8; i++) {
             if (node->children[i]) {
-                initializeRTrees(node->children[i], futures, dataPoints);
+                initializeRTrees(node->children[i], futures, dataPoints, stats);
             }
         }
     }
 }
-
 
 
 Bounds Octree::calculateBoundsForPoints(const vector<Point>& dataPoints, const vector<int>& pointsIndices) {
