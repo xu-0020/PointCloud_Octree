@@ -3,6 +3,17 @@
 using namespace std;
 
 
+struct RTreeStats {
+    size_t totalLeafNodes = 0;
+    size_t totalPoints = 0;
+    size_t minPoints = std::numeric_limits<size_t>::max();
+    size_t maxPoints = 0;
+    // Mutex to protect access to this structure
+    mutex mtx; 
+};
+
+
+
 class Octree {
 private:
     OctreeNode* root;
@@ -34,7 +45,7 @@ private:
     void rangeQuery(Bounds& queryRange, vector<Point>& results, OctreeNode* node);
 
     // Function to create R-trees for each leaf node
-    void initializeRTrees(OctreeNode* node, vector<future<void>>& futures, const vector<Point>& dataPoints);
+    void initializeRTrees(OctreeNode* node, vector<future<void>>& futures, const vector<Point>& dataPoints, RTreeStats& stats);
 
     void initializeKdTrees(OctreeNode* node, vector<future<void>>& futures, const vector<Point>& dataPoints);
 
@@ -100,12 +111,26 @@ public:
     // Search leaf nodes and build R-trees
     void buildRtrees(const vector<Point>& dataPoints) {
         vector<future<void>> futures;
-        initializeRTrees(root, futures, dataPoints);
+        RTreeStats stats;
+        initializeRTrees(root, futures, dataPoints, stats);
+        
 
         // Wait for all threads to complete
         for (auto& fut : futures) {
             fut.get();
         }
+
+        // Now compute the average
+        double averagePointsPerLeaf = 0;
+        if (stats.totalLeafNodes > 0) {
+            averagePointsPerLeaf = static_cast<double>(stats.totalPoints) / stats.totalLeafNodes;
+        }
+
+        // Output the statistics
+        cout << "Max Points Per Node: " << maxPointsPerNode << endl;
+        cout << "Average points per leaf node: " << averagePointsPerLeaf << endl;
+        cout << "Minimum points in a leaf node: " << stats.minPoints << endl;
+        cout << "Maximum points in a leaf node: " << stats.maxPoints << endl;
     }
     void buildKdtrees(const vector<Point>& dataPoints) {
         vector<future<void>> futures;
