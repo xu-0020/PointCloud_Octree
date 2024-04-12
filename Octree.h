@@ -36,6 +36,8 @@ private:
     // Function to create R-trees for each leaf node
     void initializeRTrees(OctreeNode* node, vector<future<void>>& futures, const vector<Point>& dataPoints);
 
+    void initializeKdTrees(OctreeNode* node, vector<future<void>>& futures, const vector<Point>& dataPoints);
+
     Bounds calculateChildBounds(Bounds& parentBounds, int octant);
 
     void subdivideAndInsert(OctreeNode* node, int pointIdx, int depth, const vector<Point>& dataPoints);
@@ -99,6 +101,15 @@ public:
     void buildRtrees(const vector<Point>& dataPoints) {
         vector<future<void>> futures;
         initializeRTrees(root, futures, dataPoints);
+
+        // Wait for all threads to complete
+        for (auto& fut : futures) {
+            fut.get();
+        }
+    }
+    void buildKdtrees(const vector<Point>& dataPoints) {
+        vector<future<void>> futures;
+        initializeKdTrees(root, futures, dataPoints);
 
         // Wait for all threads to complete
         for (auto& fut : futures) {

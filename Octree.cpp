@@ -7,6 +7,14 @@
 const size_t max_concurrent_tasks = 30;     // concurrency control for building r-trees
 
 
+void KdInsert(KdTree* tree, vector<Point>& points){
+    if (points.size() == 0){
+        return;
+    }
+    tree->buildTree(points);
+}
+
+
 // R-tree functions
 void RInsert(RTreePoints* tree, const vector<Point>& points){
     if (points.size()==0){
@@ -59,6 +67,10 @@ void RSearch(RTreePoints* tree, std::vector<Point>& results, Bounds& queryRange)
 // End of R-tree functions
 
 
+void KdSearch(KdTree* kdtree, std::vector<Point>& results, Bounds& queryRange){
+    kdtree->rangeQuery(results,queryRange);
+    return;
+}
 
 vector<OctreeNode*> Octree::createLeafNodesMultithreaded(const vector<Point>& dataPoints, const vector<pair<int, uint64_t>>& mortonCode) {
     const size_t numThreads = 32;
@@ -200,7 +212,49 @@ void Octree::buildFromLeafNodes(vector<OctreeNode*>& nodes) {
 }
 
 
+void Octree::initializeKdTrees(OctreeNode* node, vector<future<void>>& futures, const vector<Point>& dataPoints) {
+    if (node->isLeaf()) {
 
+        // Check if reached the maximum number of concurrent tasks
+        if (futures.size() >= max_concurrent_tasks) {
+            // Wait for at least one task to complete
+            bool taskCompleted = false;
+            while (!taskCompleted) {
+                for (auto it = futures.begin(); it != futures.end(); ) {
+                    auto& fut = *it;
+                    if (fut.wait_for(chrono::seconds(0)) == future_status::ready) {
+                        fut.get();              // Get the result to clear any stored exception
+                        it = futures.erase(it);     // Remove the completed future
+                        taskCompleted = true;
+                        break;           // Break the loop as we only need one task to complete
+                    } else {
+                        it++;
+                    }
+                }
+            }
+        }
+
+        // Launch a new task for R-tree construction in the leaf node
+        futures.push_back(async(launch::async, [this, node, &dataPoints]() {
+            // Regenerate bounds for the leaf node to ensure tight fitting
+            node->bound = calculateBoundsForPoints(dataPoints, node->points);
+
+            node->kdtree = new KdTree();
+            vector<Point> insertPoints;         // Retrieve points to be inserted in to the Rtree.
+            for (int i=0; i<node->points.size(); i++) {
+                insertPoints.push_back(dataPoints[node->points[i]]);
+            }
+            node->points.clear();
+            KdInsert(node->kdtree, insertPoints);
+        }));
+    } else {
+        for (int i = 0; i < 8; i++) {
+            if (node->children[i]) {
+                initializeKdTrees(node->children[i], futures, dataPoints);
+            }
+        }
+    }
+}
 
 
 
@@ -430,12 +484,16 @@ void Octree::insert(OctreeNode* node, int pointIdx, int depth, const vector<Poin
 
 
 
-
 void Octree::rangeQuery(Bounds& queryRange, vector<Point>& results, OctreeNode* node) {
 
     if (node->isLeaf()) {
-        // If it's a leaf node, query the R-tree
-        RSearch(node->rtree, results, queryRange);
+        if (node->rtree)
+            RSearch(node->rtree, results, queryRange);
+        else if (node->kdtree){
+            vector<Point> tmp;
+            KdSearch(node->kdtree, tmp, queryRange);
+            results.insert(results.end(), tmp.begin(), tmp.end());
+        }
     } 
     else {
         for (int i = 0; i < 8; i++) {
