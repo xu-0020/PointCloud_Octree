@@ -40,6 +40,6 @@ with open(file_path, "r") as file:
 cur.close()
 conn.close()
 
-with open("Result_hkm.txt", "w") as file:
+with open("Result_tmp.txt", "w") as file:
     for item in sentence_list:
         file.write(item + "\n")
